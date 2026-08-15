@@ -21,6 +21,25 @@ import {
   TEAM2_COLORS,
 } from "~~/utils/monad-place";
 
+// 用户在钱包里拒绝签名（viem UserRejectedRequestError / MetaMask denied / EIP-1193 错误码 4001）
+const isUserRejected = (m: string) =>
+  /user rejected|user denied|userrejectedrequesterror|rejected the request|4001/i.test(m);
+
+// RPC / 网络类失败（超时、断连、限流），对应 Play 13 态模型里的 retry
+const isRpcFailure = (m: string) =>
+  /network|timeout|timed out|fetch failed|http request failed|429|rpc|internal error|econnrefused/i.test(m);
+
+// place() 失败 → 用户文案；图标前缀做非颜色线索（a11y），判定顺序：拒签 → 合约 revert → 网络 → 兜底
+const placeErrorCopy = (err: unknown) => {
+  const m = String((err as Error)?.message ?? err);
+  if (isUserRejected(m)) return "🚫 已取消，随时可以重新落子";
+  if (m.includes("SameColor")) return "🎨 这个格子已是该颜色，换一格或换色";
+  if (m.includes("Cooldown")) return "❄️ 冷却中，稍等…";
+  if (m.includes("NotLive")) return "🛑 比赛已结束";
+  if (isRpcFailure(m)) return "📡 网络波动，正在重试…";
+  return "❌ 失败：" + m.slice(0, 60);
+};
+
 // 观众端：连钱包 → 选阵营 → 选颜色 → 点画布落子（每次落子 = 1 笔真实 Monad 交易）
 const Play: NextPage = () => {
   const { address, isConnected } = useAccount();
@@ -35,6 +54,11 @@ const Play: NextPage = () => {
     contractName: "PlaceCanvas",
     functionName: "isSealed",
   });
+  // 比赛自然结束时间（seal 后合约会把它改写为封盘时刻，所以三态判定必须 sealed 优先）
+  const { data: endAt } = useScaffoldReadContract({
+    contractName: "PlaceCanvas",
+    functionName: "endAt",
+  });
   // 主持人（部署者）判定：仅 owner 钱包能看到封盘按钮
   const { data: owner } = useScaffoldReadContract({ contractName: "PlaceCanvas", functionName: "owner" });
   const isHost = !!address && !!owner && address.toLowerCase() === String(owner).toLowerCase();
@@ -46,6 +70,10 @@ const Play: NextPage = () => {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("选择阵营开始");
   const [cdLeft, setCdLeft] = useState(0);
+  // 封盘两步确认：第一步弹确认层，确认层里的红色按钮才触发第二步 sealGame
+  const [sealConfirmOpen, setSealConfirmOpen] = useState(false);
+  // 顶条 expired 判定用的本地时钟（每秒走针）
+  const [now, setNow] = useState(() => Date.now());
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // 本地画布状态（Uint8Array 与链上 pixels 对齐，冷启动 + 事件流维护）
@@ -100,6 +128,22 @@ const Play: NextPage = () => {
     },
   });
 
+  // 每秒走针：驱动顶条 expired 判定（画布是 canvas 绘制，重渲染不会引起重画）
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // ESC 关闭封盘确认层（dialog 键盘语义；busy 发交易中不可关）
+  useEffect(() => {
+    if (!sealConfirmOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) setSealConfirmOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sealConfirmOpen, busy]);
+
   const onCanvasClick = async (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isConnected) {
       setStatus("请先连接钱包");
@@ -132,23 +176,15 @@ const Play: NextPage = () => {
         });
       }, 1000);
     } catch (err) {
-      const m = String((err as Error)?.message ?? err);
-      setStatus(
-        m.includes("Cooldown")
-          ? "冷却中，稍等…"
-          : m.includes("SameColor")
-            ? "同色已占用"
-            : m.includes("NotLive")
-              ? "比赛已结束"
-              : "失败：" + m.slice(0, 60),
-      );
+      setStatus(placeErrorCopy(err));
     }
     setBusy(false);
   };
 
-  // 主持人终局：封盘冻结画布并生成链上指纹（仅部署者钱包可见此按钮）
+  // 主持人终局·第二步：只有确认层里点过"确认封盘"才会走到这里（seal 不可逆，必须两步确认）
   const sealGame = async () => {
     if (busy) return;
+    setSealConfirmOpen(false);
     setBusy(true);
     setStatus("封盘中…（整幅画布 keccak256 指纹计算 ≈5.6M gas，请稍候）");
     try {
@@ -161,12 +197,22 @@ const Play: NextPage = () => {
       setStatus("🏁 已封盘，画布指纹永久上链");
     } catch (err) {
       const m = String((err as Error)?.message ?? err);
-      setStatus("封盘失败：" + m.slice(0, 60));
+      setStatus(
+        isUserRejected(m)
+          ? "🚫 已取消封盘，画布未受影响"
+          : isRpcFailure(m)
+            ? "📡 网络波动，封盘未完成，请重新确认"
+            : "❌ 封盘失败：" + m.slice(0, 60),
+      );
     }
     setBusy(false);
   };
 
   const colors = team === 1 ? TEAM1_COLORS : TEAM2_COLORS;
+
+  // 顶条三态：sealed > expired（endAt < now 且未 seal）> live；endAt 加载中先按 live，避免闪跳
+  const endAtMs = endAt !== undefined && endAt !== null ? Number(endAt) * 1000 : null;
+  const phase = isSealed ? "sealed" : endAtMs !== null && now > endAtMs ? "expired" : "live";
 
   if (loadingContract) return <main className="flex items-center justify-center min-h-screen">加载合约信息…</main>;
   if (!contractInfo)
@@ -181,6 +227,17 @@ const Play: NextPage = () => {
       <h1 className="text-2xl font-bold">
         Monad Place <span className="text-violet-500">紫晶</span> vs <span className="text-amber-500">黄金</span>
       </h1>
+
+      {/* 顶条三态：live / expired / sealed，图标 + 文案做非颜色线索（a11y） */}
+      <div className="mt-2">
+        {phase === "sealed" ? (
+          <span className="badge badge-neutral gap-1">🏁 已封盘·指纹已上链</span>
+        ) : phase === "expired" ? (
+          <span className="badge badge-warning badge-outline gap-1">⏰ 比赛时间已到</span>
+        ) : (
+          <span className="badge badge-success badge-outline gap-1">🟢 战斗进行中</span>
+        )}
+      </div>
 
       {/* 阵营选择 */}
       <div className="flex gap-3 mt-3">
@@ -263,9 +320,39 @@ const Play: NextPage = () => {
         </a>
       </div>
       {isHost && !isSealed && (
-        <button className="btn btn-error btn-sm mt-2" onClick={sealGame} disabled={busy}>
+        <button className="btn btn-error btn-sm mt-2" onClick={() => setSealConfirmOpen(true)} disabled={busy}>
           🏁 主持人封盘
         </button>
+      )}
+
+      {/* 封盘第一步：确认层（DaisyUI modal 受控渲染）。只有红色"确认封盘"才进入第二步发 seal 交易 */}
+      {sealConfirmOpen && (
+        <div
+          className="modal modal-open"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="seal-confirm-title"
+          aria-describedby="seal-confirm-desc"
+        >
+          <div className="modal-box max-w-sm">
+            <h3 id="seal-confirm-title" className="text-lg font-bold">
+              ❄️ 冻结整幅画布？
+            </h3>
+            <p id="seal-confirm-desc" className="py-4 text-sm">
+              seal() 不可逆，将生成永久链上指纹
+            </p>
+            <div className="modal-action">
+              <button className="btn btn-sm" onClick={() => setSealConfirmOpen(false)}>
+                再想想
+              </button>
+              <button className="btn btn-sm btn-error" onClick={sealGame}>
+                确认封盘
+              </button>
+            </div>
+          </div>
+          {/* 点击遮罩 = 再想想（键盘路径：Esc / Tab 聚焦按钮） */}
+          <div className="modal-backdrop" onClick={() => setSealConfirmOpen(false)} />
+        </div>
       )}
       <p className="text-xs opacity-60 mt-1 text-center">每次落子 = 1 笔真实 Monad 测试网交易 · 冷却由智能合约强制</p>
     </main>
