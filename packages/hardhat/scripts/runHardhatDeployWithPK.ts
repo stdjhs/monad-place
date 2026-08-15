@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { Wallet } from "ethers";
 import password from "@inquirer/password";
-import { spawn } from "child_process";
+import { CONFIGURED_NETWORKS, spawnPackageBin } from "./spawnPackageBin.js";
 
 /**
  * Unencrypts the private key and runs the hardhat deploy command,
@@ -9,7 +9,15 @@ import { spawn } from "child_process";
  */
 async function main() {
   const networkIndex = process.argv.indexOf("--network");
-  const networkName = networkIndex !== -1 ? process.argv[networkIndex + 1] : "default";
+  const rawNetwork = networkIndex !== -1 ? process.argv[networkIndex + 1] : "default";
+
+  // The network passed to the child process is picked from the CONFIGURED_NETWORKS
+  // literals, never forwarded from raw argv. Unknown names are rejected up front.
+  const networkName = CONFIGURED_NETWORKS.find(n => n === rawNetwork);
+  if (!networkName) {
+    console.error(`Unknown network: ${rawNetwork}. Valid networks: ${CONFIGURED_NETWORKS.join(", ")}`);
+    process.exit(1);
+  }
 
   const isLocalNetwork = networkName === "default" || networkName === "hardhat";
 
@@ -33,14 +41,12 @@ async function main() {
     }
   }
 
-  // Run hardhat deploy (compilation already handled by the npm script)
-  const deployArgs = ["deploy", "--no-compile", "--skip-prompts", ...process.argv.slice(2)];
+  // Run hardhat deploy (compilation already handled by the npm script).
+  // All arguments are fixed literals plus the allowlisted network from above.
+  const deployArgs = ["deploy", "--no-compile", "--skip-prompts"];
+  if (networkIndex !== -1) deployArgs.push("--network", networkName);
 
-  const hardhat = spawn("hardhat", deployArgs, {
-    stdio: "inherit",
-    env: process.env,
-    shell: process.platform === "win32",
-  });
+  const hardhat = spawnPackageBin("hardhat", "hardhat", deployArgs);
 
   hardhat.on("exit", code => {
     process.exit(code || 0);

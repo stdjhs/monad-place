@@ -26,7 +26,9 @@ export type BaseConfig = {
 
 export type ScaffoldConfig = BaseConfig;
 
-export const DEFAULT_ALCHEMY_API_KEY = "IZYEU2cWBgnFmgiTAgpWD";
+// 不随仓库分发共享 API key：需要 Alchemy 时在 .env.local / Vercel 配 NEXT_PUBLIC_ALCHEMY_API_KEY
+// （本项目 RPC 已由 rpcOverrides 固定走 Monad 官方公共端点，默认空值不影响功能）
+export const DEFAULT_ALCHEMY_API_KEY = "";
 
 const scaffoldConfig = {
   // The networks on which your DApp is live
@@ -35,7 +37,7 @@ const scaffoldConfig = {
   // 公共 RPC 限流实测（429）：8 个读 hook × 1s 轮询会打爆 testnet-rpc。降至 2.5s
   // （链上比分本就以轮询校正为准，2.5s 不影响观感；观众端手机各自轮询，此项同时降低全场总请求量）
   pollingInterval: 2500,
-  // This is ours Alchemy's default API key.
+  // No shared key is shipped: set your own via NEXT_PUBLIC_ALCHEMY_API_KEY if needed.
   // You can get your own at https://dashboard.alchemyapi.io
   // It's recommended to store it in an env variable:
   // .env.local for local testing, and in the Vercel/system env config for live apps.

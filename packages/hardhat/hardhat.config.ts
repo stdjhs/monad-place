@@ -9,11 +9,12 @@ import generateTsAbis from "./scripts/generateTsAbis.js";
 const deployerPrivateKey =
   process.env.__RUNTIME_DEPLOYER_PRIVATE_KEY ?? "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
-// If not set, it uses ours Alchemy's default API key.
+// Set ALCHEMY_API_KEY in packages/hardhat/.env if you need Alchemy-backed networks or forking.
 // You can get your own at https://dashboard.alchemyapi.io
-const providerApiKey = process.env.ALCHEMY_API_KEY || "IZYEU2cWBgnFmgiTAgpWD";
+const providerApiKey = process.env.ALCHEMY_API_KEY || "";
 
-export const etherscanApiKey = process.env.ETHERSCAN_API_KEY || "DNXJA8RX2Q3VZ4URQIWP7Z68CJXQZSC6AW";
+// Set ETHERSCAN_API_KEY in packages/hardhat/.env for contract verification.
+export const etherscanApiKey = process.env.ETHERSCAN_API_KEY || "";
 
 const deployTasks = [
   overrideTask("deploy")
