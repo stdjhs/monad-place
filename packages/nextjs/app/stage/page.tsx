@@ -108,16 +108,22 @@ const Stage: NextPage = () => {
         ctx.fillStyle = EMPTY_COLOR;
         ctx.fillRect(0, 0, BOARD_WIDTH * CELL, BOARD_HEIGHT * CELL);
       }
-      const rows = (await Promise.all(
-        Array.from({ length: BOARD_HEIGHT }, (_, y) =>
-          publicClient.readContract({
-            address: contractInfo.address,
-            abi: contractInfo.abi,
-            functionName: "getRow",
-            args: [y],
-          }),
-        ),
-      )) as (readonly number[])[];
+      // 分批并行（每批 6 行，间隔 150ms）：36 个瞬时请求会触发公共 RPC 429 限流
+      const rows: (readonly number[])[] = [];
+      for (let batch = 0; batch < BOARD_HEIGHT; batch += 6) {
+        const part = (await Promise.all(
+          Array.from({ length: Math.min(6, BOARD_HEIGHT - batch) }, (_, i) =>
+            publicClient.readContract({
+              address: contractInfo.address,
+              abi: contractInfo.abi,
+              functionName: "getRow",
+              args: [batch + i],
+            }),
+          ),
+        )) as (readonly number[])[];
+        rows.push(...part);
+        await new Promise(r => setTimeout(r, 150));
+      }
       rows.forEach((row, y) => {
         for (let x = 0; x < BOARD_WIDTH; x++) if (row[x]) paintCell(y * BOARD_WIDTH + x, Number(row[x]), false);
       });

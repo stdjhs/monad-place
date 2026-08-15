@@ -32,8 +32,9 @@ const scaffoldConfig = {
   // The networks on which your DApp is live
   // Monad 测试网为演示目标网络；保留 hardhat 便于本地 yarn chain 开发调试
   targetNetworks: [monadTestnet, chains.hardhat],
-  // Monad 出块约 1s，按官方建议将轮询间隔降至 1s（默认 4000ms 对 L2/高性能链太慢）
-  pollingInterval: 1000,
+  // 公共 RPC 限流实测（429）：8 个读 hook × 1s 轮询会打爆 testnet-rpc。降至 2.5s
+  // （链上比分本就以轮询校正为准，2.5s 不影响观感；观众端手机各自轮询，此项同时降低全场总请求量）
+  pollingInterval: 2500,
   // This is ours Alchemy's default API key.
   // You can get your own at https://dashboard.alchemyapi.io
   // It's recommended to store it in an env variable:
