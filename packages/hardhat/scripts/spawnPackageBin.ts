@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import { existsSync, readFileSync } from "fs";
-import { dirname, resolve } from "path";
+import { dirname, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 
 // 参数白名单：只放行旗标/十六进制地址/路径/常见选项字符。空格、引号与 shell 元字符一律拒绝——
@@ -75,5 +75,11 @@ export function spawnPackageBin(
   const binRel = typeof pkg.bin === "string" ? pkg.bin : pkg.bin?.[binName];
   if (!binRel) throw new Error(`No "${binName}" bin entry in ${pkgName}`);
 
-  return spawn(process.execPath, [resolve(pkgRoot, binRel), ...args], { stdio: "inherit", env });
+  // bin 字段来自依赖清单：仍校验解析结果不逃出包目录，防异常清单把入口指向任意脚本
+  const binAbs = resolve(pkgRoot, binRel);
+  if (!binAbs.startsWith(pkgRoot + sep)) {
+    throw new Error(`Refused "${binName}": bin entry resolves outside the package directory`);
+  }
+
+  return spawn(process.execPath, [binAbs, ...args], { stdio: "inherit", env });
 }
