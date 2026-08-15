@@ -35,6 +35,15 @@ const Play: NextPage = () => {
     contractName: "PlaceCanvas",
     functionName: "isSealed",
   });
+  // 入场态（M5）：终局时间戳，用于 live/expired/sealed 顶条
+  const { data: endAt } = useScaffoldReadContract({ contractName: "PlaceCanvas", functionName: "endAt" });
+  // 渲染期不可调用 Date.now()（React Compiler 纯函数规则）：用每秒 tick 的 state 驱动过期判定
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const expired = !isSealed && endAt !== undefined && nowTs / 1000 > Number(endAt);
   // 主持人（部署者）判定：仅 owner 钱包能看到封盘按钮
   const { data: owner } = useScaffoldReadContract({ contractName: "PlaceCanvas", functionName: "owner" });
   const isHost = !!address && !!owner && address.toLowerCase() === String(owner).toLowerCase();
@@ -46,6 +55,7 @@ const Play: NextPage = () => {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("选择阵营开始");
   const [cdLeft, setCdLeft] = useState(0);
+  const [confirmSeal, setConfirmSeal] = useState(false); // M3：封盘两步确认弹层
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // 本地画布状态（Uint8Array 与链上 pixels 对齐，冷启动 + 事件流维护）
@@ -133,21 +143,27 @@ const Play: NextPage = () => {
       }, 1000);
     } catch (err) {
       const m = String((err as Error)?.message ?? err);
+      // 状态矩阵补齐（M2-play）：每类失败给出明确可行动文案（带图标=非颜色线索）
       setStatus(
         m.includes("Cooldown")
-          ? "冷却中，稍等…"
+          ? "⏳ 冷却中，稍等…"
           : m.includes("SameColor")
-            ? "同色已占用"
+            ? "🎨 这个格子已是该颜色，换一格或换色"
             : m.includes("NotLive")
-              ? "比赛已结束"
-              : "失败：" + m.slice(0, 60),
+              ? "🏁 比赛已结束"
+              : /rejected|denied|cancel/i.test(m)
+                ? "↩️ 已取消，随时可以重新落子"
+                : /timeout|network|fetch|ECONN/i.test(m)
+                  ? "📡 网络波动，请重试…"
+                  : "⚠️ 失败：" + m.slice(0, 60),
       );
     }
     setBusy(false);
   };
 
-  // 主持人终局：封盘冻结画布并生成链上指纹（仅部署者钱包可见此按钮）
+  // 主持人终局：两步确认（B 轨 /host 交互设计）→ 确认后才发交易（不可逆操作的仪式感）
   const sealGame = async () => {
+    setConfirmSeal(false);
     if (busy) return;
     setBusy(true);
     setStatus("封盘中…（整幅画布 keccak256 指纹计算 ≈5.6M gas，请稍候）");
@@ -178,6 +194,14 @@ const Play: NextPage = () => {
 
   return (
     <main className="flex flex-col items-center pt-4 pb-8 px-3 min-h-screen">
+      {/* M5 入场态顶条：live / expired / sealed（图标=非颜色线索） */}
+      <div
+        className={`w-full max-w-2xl text-center text-sm py-1.5 rounded-full mb-1 ${
+          isSealed ? "bg-mp-surface text-mp-muted" : expired ? "bg-mp-surface text-mp-gold" : "bg-mp-surface text-mp-ok"
+        }`}
+      >
+        {isSealed ? "🏁 已封盘 · 指纹已上链" : expired ? "⏰ 比赛时间已到" : "🟢 战斗进行中 · 扫码即参战"}
+      </div>
       <h1 className="text-2xl font-bold">
         Monad Place <span className="text-violet-500">紫晶</span> vs <span className="text-amber-500">黄金</span>
       </h1>
@@ -263,9 +287,35 @@ const Play: NextPage = () => {
         </a>
       </div>
       {isHost && !isSealed && (
-        <button className="btn btn-error btn-sm mt-2" onClick={sealGame} disabled={busy}>
+        <button className="btn btn-error btn-sm mt-2 mp-touch" onClick={() => setConfirmSeal(true)} disabled={busy}>
           🏁 主持人封盘
         </button>
+      )}
+
+      {/* M3 两步确认弹层（B 轨 /host 设计：不可逆操作的仪式感） */}
+      {confirmSeal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="确认封盘"
+        >
+          <div className="bg-mp-surface border border-white/15 rounded-xl p-6 max-w-sm w-full text-center">
+            <h2 className="text-lg font-bold mb-2">冻结整幅画布？</h2>
+            <p className="text-sm opacity-80 mb-1">
+              seal() <b>不可逆</b>：将停止一切落子，并对当前 2304 格生成永久 keccak256 链上指纹。
+            </p>
+            <p className="text-xs opacity-60 mb-5">建议在 Demo 终局时刻、主持人喊停后执行。</p>
+            <div className="flex gap-3 justify-center">
+              <button className="btn btn-sm btn-outline mp-touch" onClick={() => setConfirmSeal(false)}>
+                再想想
+              </button>
+              <button className="btn btn-sm btn-error mp-touch" onClick={sealGame} disabled={busy}>
+                {busy ? "封盘中…" : "确认封盘"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <p className="text-xs opacity-60 mt-1 text-center">每次落子 = 1 笔真实 Monad 测试网交易 · 冷却由智能合约强制</p>
     </main>

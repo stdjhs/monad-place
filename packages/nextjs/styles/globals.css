@@ -5,6 +5,18 @@
 @theme {
   --shadow-center: 0 0 12px -2px rgb(0 0 0 / 0.05);
   --animate-pulse-fast: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  /* M1 · Monad Place 品牌设计系统（来源：B 轨 brand-spec.md，OKLch 换算注释保留 hex 源）
+     生成工具类：bg-mp-bg / bg-mp-surface / text-mp-fg / text-mp-muted / bg-mp-accent / text-mp-gold / text-mp-ok */
+  --color-mp-bg: #151035; /* oklch(20.509% 0.0697 284.58) 深靛底 */
+  --color-mp-surface: #1c124b; /* oklch(23.812% 0.0997 283.86) 卡片面 */
+  --color-mp-fg: #fafafa; /* 主前景 */
+  --color-mp-muted: #a7a3c2; /* 次级文字 */
+  --color-mp-accent: #8b5cf6; /* 唯一交互紫 */
+  --color-mp-gold: #fbbf24; /* 黄金部落（仅敌方阵营使用） */
+  --color-mp-ok: #34d399; /* 成功/在线 */
+  --font-display: "Trebuchet MS", "Microsoft YaHei UI", sans-serif;
+  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 @plugin "daisyui" {
@@ -117,4 +129,28 @@
 
 .link:hover {
   opacity: 80%;
+}
+
+/* M4 · 无障碍（B 轨 PRD 验收标准落地） */
+/* 键盘焦点环：2px 品牌紫，所有可交互元素可见聚焦 */
+:focus-visible {
+  outline: 2px solid var(--color-mp-accent);
+  outline-offset: 2px;
+}
+
+/* 触控目标最小 44px（移动端主按钮用） */
+.mp-touch {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* 减少动态：关闭动画与涟漪类特效（眩晕症友好） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

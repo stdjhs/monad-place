@@ -27,6 +27,16 @@ const Stage: NextPage = () => {
     contractName: "PlaceCanvas",
     functionName: "uniquePlayers",
   });
+  // M5 入场态：isSealed/endAt 链上真值 → live/expired/sealed 顶条（刷新后依然正确，不依赖事件缓存）
+  const { data: isSealed } = useScaffoldReadContract({ contractName: "PlaceCanvas", functionName: "isSealed" });
+  const { data: endAt } = useScaffoldReadContract({ contractName: "PlaceCanvas", functionName: "endAt" });
+  // 渲染期不可调用 Date.now()（React Compiler 纯函数规则）：用每秒 tick 的 state 驱动过期判定
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const expired = !isSealed && endAt !== undefined && nowTs / 1000 > Number(endAt);
 
   // 本地实时数据：TPS（5s 滑动窗口）与排行榜（placedCount 只增不减，无漂移问题）
   const recentRef = useRef<number[]>([]);
@@ -34,6 +44,8 @@ const Stage: NextPage = () => {
   const [tps, setTps] = useState(0);
   const [top5, setTop5] = useState<[string, number][]>([]);
   const [sealed, setSealed] = useState<{ hash: string; total: string; players: string } | null>(null);
+  // M2-stage：冷启动完成标记（加载态 → 空态 → 实时）
+  const [booted, setBooted] = useState(false);
 
   // P-C 回放模式：?replay=1 进入（ref+state 双轨：ref 供下方各实时 effect 守卫，state 供渲染）
   const [replayMode, setReplayMode] = useState(false);
@@ -109,6 +121,7 @@ const Stage: NextPage = () => {
       rows.forEach((row, y) => {
         for (let x = 0; x < BOARD_WIDTH; x++) if (row[x]) paintCell(y * BOARD_WIDTH + x, Number(row[x]), false);
       });
+      setBooted(true); // 冷启动完成：撤下"正在同步画布…"加载态
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicClient, contractInfo?.address]);
@@ -386,14 +399,22 @@ const Stage: NextPage = () => {
     );
 
   return (
-    <main className="flex flex-col h-screen bg-[#05060f] text-[#e2e8f0] overflow-hidden">
-      {/* HUD：比分与统计直接读链上真值 */}
-      <div className="flex items-center gap-6 px-6 py-3 bg-[#0b0e1d] border-b border-[#1e2440] text-xl shrink-0">
+    <main className="flex flex-col h-screen bg-mp-bg text-mp-fg overflow-hidden">
+      {/* HUD：比分与统计直接读链上真值（配色对齐 B 轨设计 tokens） */}
+      <div className="flex items-center gap-6 px-6 py-3 bg-mp-surface border-b border-white/15 text-xl shrink-0">
+        {/* M5 入场态顶条（大屏字号）：图标=非颜色线索 */}
+        <span
+          className={`px-3 py-1 rounded-full text-base font-bold ${
+            isSealed ? "text-mp-muted border border-white/15" : expired ? "text-mp-gold" : "text-mp-ok"
+          }`}
+        >
+          {isSealed ? "🏁 已封盘" : expired ? "⏰ 比赛时间已到" : "🟢 战斗进行中"}
+        </span>
         <span>
           紫晶军团 <b className="text-[#a78bfa] text-2xl">{t1?.toString() ?? "0"}</b>
         </span>
         <span>
-          黄金部落 <b className="text-[#fbbf24] text-2xl">{t2?.toString() ?? "0"}</b>
+          黄金部落 <b className="text-mp-gold text-2xl">{t2?.toString() ?? "0"}</b>
         </span>
         <span>
           总交易 <b className="text-2xl">{totalPlaced?.toString() ?? "0"}</b>
@@ -402,20 +423,20 @@ const Stage: NextPage = () => {
           玩家 <b className="text-2xl">{uniquePlayers?.toString() ?? "0"}</b>
         </span>
         {/* WS 徽标：monadLogs 投机订阅激活=⚡实时；断连降级 polling=↻轮询 */}
-        <span className={`ml-auto text-base font-bold ${wsActive ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
+        <span className={`ml-auto text-base font-bold ${wsActive ? "text-mp-ok" : "text-mp-gold"}`}>
           {wsActive ? "⚡实时" : "↻轮询"}
         </span>
-        <span className="text-2xl text-[#34d399]">TPS {tps.toFixed(1)}</span>
+        <span className="text-2xl text-mp-ok">TPS {tps.toFixed(1)}</span>
         {/* P-A 并行仪表：同块并发 + 整链块吞吐 + 本合约最近 20 块迷你柱状图（数据来自对账循环） */}
         <ParallelMeter stats={parallelStats} />
-        <span className="text-base text-[#94a3b8]">扫码参战 → {playUrl}</span>
+        <span className="text-base text-mp-muted">扫码参战 → {playUrl}</span>
         {/* P-C 回放入口：isSealed 后高亮（终局回放 = L3 数据服务演示）；回放模式下变退出 */}
         {replayMode ? (
           <button
             onClick={() => {
               window.location.href = "/stage";
             }}
-            className="px-3 py-1 rounded border border-[#fbbf24] text-[#fbbf24] text-base font-bold cursor-pointer"
+            className="px-3 py-1 rounded border border-mp-gold text-mp-gold text-base font-bold cursor-pointer"
           >
             ↩ 退出回放
           </button>
@@ -425,7 +446,7 @@ const Stage: NextPage = () => {
               window.location.href = "/stage?replay=1";
             }}
             className={`px-3 py-1 rounded border text-base font-bold cursor-pointer ${
-              sealed ? "border-[#fbbf24] text-[#fbbf24]" : "border-[#1e2440] text-[#94a3b8]"
+              sealed ? "border-mp-gold text-mp-gold" : "border-white/15 text-mp-muted"
             }`}
           >
             ⏪ 回放
@@ -449,13 +470,24 @@ const Stage: NextPage = () => {
             height={BOARD_HEIGHT * CELL}
             className="absolute inset-0 w-full h-full"
           />
+
+          {/* M2-stage 状态层：加载态 → 空态（链上真值 totalPlaced），不拦截点击 */}
+          {!replayMode && !sealed && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {!booted ? (
+                <span className="text-2xl text-mp-muted animate-pulse">正在同步画布…</span>
+              ) : (totalPlaced ?? 0n) === 0n ? (
+                <span className="text-3xl font-bold text-mp-muted animate-pulse">⌛ 等待第一笔交易…</span>
+              ) : null}
+            </div>
+          )}
         </div>
 
         {/* 封盘横幅 */}
         {sealed && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#05060fd9] text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-mp-bg/85 text-center">
             <h1 className="text-5xl font-bold">🏁 画布已上链</h1>
-            <p className="mt-4 font-mono text-xl text-[#34d399] break-all max-w-[80%]">{sealed.hash}</p>
+            <p className="mt-4 font-mono text-xl text-mp-ok break-all max-w-[80%]">{sealed.hash}</p>
             <p className="mt-3 text-xl">
               {sealed.players} 名玩家 · {sealed.total} 笔交易 · 永久上链
             </p>
@@ -474,7 +506,7 @@ const Stage: NextPage = () => {
 
         {/* 排行榜（回放模式隐藏：实时排行数据在回放中不更新） */}
         {!replayMode && top5.length > 0 && (
-          <div className="absolute right-4 bottom-4 bg-[#0b0e1dcc] px-4 py-3 rounded-lg text-base">
+          <div className="absolute right-4 bottom-4 bg-mp-surface/90 px-4 py-3 rounded-lg text-base">
             <b>🏅 排行榜</b>
             {top5.map(([addr, n], i) => (
               <div key={addr}>
