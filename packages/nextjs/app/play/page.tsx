@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { NextPage } from "next";
 import { parseGwei } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
@@ -231,9 +232,36 @@ const Play: NextPage = () => {
         }}
       />
 
-      <p className="mt-3 h-6 text-sm">
-        {isSealed ? "🏁 比赛已封盘，画布指纹已上链" : cdLeft > 0 ? `⏳ 冷却 ${cdLeft}s` : status}
-      </p>
+      {/* 状态行：冷却期显示 radial-progress 环形进度（daisyui），其余显示文字状态 */}
+      <div className="mt-3 min-h-14 flex flex-col items-center justify-center gap-2 text-sm">
+        {isSealed ? (
+          <span>🏁 比赛已封盘，画布指纹已上链</span>
+        ) : cdLeft > 0 ? (
+          <span className="flex items-center gap-2">
+            <span
+              className="radial-progress text-violet-500"
+              style={
+                {
+                  "--value": Math.round((1 - cdLeft / Math.max(Number(cooldownSeconds ?? 3), 1)) * 100),
+                  "--size": "2.2rem",
+                  "--thickness": "3px",
+                } as CSSProperties
+              }
+              role="progressbar"
+              aria-valuenow={cdLeft}
+            >
+              {cdLeft}
+            </span>
+            冷却中…
+          </span>
+        ) : (
+          <span>{status}</span>
+        )}
+        {/* 观看模式入口：大屏投影页（合唱 / 并行仪表 / 回放都在那里） */}
+        <a href="/stage" target="_blank" rel="noreferrer" className="btn btn-xs btn-outline gap-1">
+          📺 观看大屏模式
+        </a>
+      </div>
       {isHost && !isSealed && (
         <button className="btn btn-error btn-sm mt-2" onClick={sealGame} disabled={busy}>
           🏁 主持人封盘

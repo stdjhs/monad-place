@@ -4,6 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { NextPage } from "next";
 import { decodeEventLog, parseAbiItem } from "viem";
 import { usePublicClient } from "wagmi";
+import MassChorus from "~~/components/monad-place/MassChorus";
+import ParallelMeter from "~~/components/monad-place/ParallelMeter";
+import type { ParallelStats } from "~~/components/monad-place/ParallelMeter";
+import ReplayEngine from "~~/components/monad-place/ReplayEngine";
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWatchContractEvent } from "~~/hooks/scaffold-eth";
 import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY_COLOR, PALETTE, playNote } from "~~/utils/monad-place";
 
@@ -31,6 +35,16 @@ const Stage: NextPage = () => {
   const [top5, setTop5] = useState<[string, number][]>([]);
   const [sealed, setSealed] = useState<{ hash: string; total: string; players: string } | null>(null);
 
+  // P-C 回放模式：?replay=1 进入（ref+state 双轨：ref 供下方各实时 effect 守卫，state 供渲染）
+  const [replayMode, setReplayMode] = useState(false);
+  const replayRef = useRef(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("replay") === "1") {
+      replayRef.current = true;
+      setReplayMode(true);
+    }
+  }, []);
+
   const baseRef = useRef<HTMLCanvasElement>(null); // 像素层
   const fxRef = useRef<HTMLCanvasElement>(null); // 特效层（涟漪，每帧清空重画）
   const gridRef = useRef(new Uint8Array(BOARD_WIDTH * BOARD_HEIGHT));
@@ -48,8 +62,33 @@ const Stage: NextPage = () => {
     if (ripple) ripplesRef.current.push({ x: x + CELL / 2, y: y + CELL / 2, t: performance.now(), color: c });
   };
 
-  // 冷启动：36 行并行拉取链上全量画布（Promise.all，全量出图 ~3s）
+  // P-C 回放回调：正常帧 = 涟漪 + 音符（40ms 节流防倍速下爆音墙）+ TPS 重现
+  const lastNoteRef = useRef(0);
+  const replayEvent = (idx: number, c: number) => {
+    paintCell(idx, c, true);
+    const now = Date.now();
+    if (now - lastNoteRef.current > 40) {
+      playNote(c);
+      lastNoteRef.current = now;
+    }
+    recentRef.current.push(now);
+    recentRef.current = recentRef.current.filter(t => now - t < 5000);
+    setTps(recentRef.current.length / 5);
+  };
+  // 回放 seek 快进：只画像素（无特效无音，几万帧也不卡）
+  const fastPaint = (idx: number, c: number) => paintCell(idx, c, false);
+  // 回放重置：清空画布回到空白
+  const clearCanvas = () => {
+    const ctx = baseRef.current?.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = EMPTY_COLOR;
+      ctx.fillRect(0, 0, BOARD_WIDTH * CELL, BOARD_HEIGHT * CELL);
+    }
+  };
+
+  // 冷启动：36 行并行拉取链上全量画布（Promise.all，全量出图 ~3s）；回放模式自带冷启动（从空白重演）
   useEffect(() => {
+    if (replayRef.current) return;
     if (!publicClient || !contractInfo) return;
     (async () => {
       const ctx = baseRef.current?.getContext("2d");
@@ -76,13 +115,34 @@ const Stage: NextPage = () => {
 
   // 对账补拉：每 2s 核对块高，遗漏区间按 100 块窗口补像素
   // （官方公共 RPC eth_getLogs 限 100 块/次；断线重连后大跨度必须分页，否则 -32602 假死）
+  // 同一循环顺带采集 P-A 并行仪表数据：本合约每块聚类 + 整链块吞吐，无额外请求负担
   const lastBlockRef = useRef(0n);
+  const perBlockMapRef = useRef(new Map<bigint, number>()); // 块高 → 本合约该块落子数
+  const chainTxRef = useRef<number | null>(null); // 最新采样块的全网交易数
+  const [parallelStats, setParallelStats] = useState<ParallelStats>({ concurrent: 0, perBlock: [], chainTx: null });
   useEffect(() => {
+    if (replayRef.current) return; // 回放模式不跑实时对账
     if (!publicClient || !contractInfo) return;
     let stop = false;
+
+    // 整链块吞吐：官方推荐 eth_getBlockReceipts 批量法；RPC 不支持时回退全交易块计数（本地链冒烟兼容）
+    const sampleChainThroughput = async (bn: bigint) => {
+      try {
+        chainTxRef.current = (await publicClient.getBlockReceipts({ blockNumber: bn })).length;
+      } catch {
+        try {
+          const blk = await publicClient.getBlock({ blockNumber: bn, includeTransactions: true });
+          chainTxRef.current = blk.transactions.length;
+        } catch {
+          // 双法皆败：保持上一采样值
+        }
+      }
+    };
+
     const tick = async () => {
       try {
         const bn = await publicClient.getBlockNumber();
+        void sampleChainThroughput(bn);
         if (lastBlockRef.current === 0n) {
           lastBlockRef.current = bn; // 首轮只建基线
           return;
@@ -95,11 +155,28 @@ const Stage: NextPage = () => {
             eventName: "PixelPlaced",
             fromBlock: s,
             toBlock: e,
-          })) as { args: { idx?: unknown; color?: unknown } }[];
-          // 只补像素不重复计 TPS/排行（实时通道已计过；paintCell 幂等）
-          logs.forEach(log => paintCell(Number(log.args.idx ?? 0), Number(log.args.color ?? 0), false));
+          })) as { args: { idx?: unknown; color?: unknown }; blockNumber: bigint | null }[];
+          // 只补像素不重复计 TPS/排行（实时通道已计过；paintCell 幂等）；
+          // 同时按块聚类给并行仪表（聚类与 lastBlockRef 同步推进，窗口不重叠故不重复计数）
+          logs.forEach(log => {
+            paintCell(Number(log.args.idx ?? 0), Number(log.args.color ?? 0), false);
+            if (log.blockNumber !== null) {
+              perBlockMapRef.current.set(log.blockNumber, (perBlockMapRef.current.get(log.blockNumber) ?? 0) + 1);
+            }
+          });
           lastBlockRef.current = e;
         }
+        // 输出并行仪表快照：修剪旧块后取最近 20 个有事件块 + 最新整链采样
+        const entries = Array.from(perBlockMapRef.current.entries()).sort((a, b) =>
+          a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+        );
+        for (let i = 0; i < entries.length - 20; i++) perBlockMapRef.current.delete(entries[i][0]);
+        const perBlock = entries.slice(-20).map(([, n]) => n);
+        setParallelStats({
+          concurrent: perBlock.length > 0 ? perBlock[perBlock.length - 1] : 0,
+          perBlock,
+          chainTx: chainTxRef.current,
+        });
       } catch {
         // RPC 抖动：跳过本轮，2s 后重试
       }
@@ -118,7 +195,9 @@ const Stage: NextPage = () => {
   // 实现用浏览器原生 WebSocket + eth_subscribe + viem decodeEventLog（不依赖 viem 的 subscribeLogs 类型）
   // 断开自动重连（3s），期间 wsActiveRef=false → 下方 polling 通道接管（防 TPS 双计）
   const wsActiveRef = useRef(false);
+  const [wsActive, setWsActive] = useState(false); // 徽标渲染态：⚡实时 / ↻轮询
   useEffect(() => {
+    if (replayRef.current) return; // 回放模式不开实时 WS
     if (!contractInfo) return;
     const PIXEL_EVENT = parseAbiItem(
       "event PixelPlaced(address indexed user, uint256 indexed idx, uint8 color, uint8 team, uint256 placedAt)",
@@ -140,6 +219,7 @@ const Stage: NextPage = () => {
         if (decoded.eventName !== "PixelPlaced") return;
         const a = decoded.args as { user?: unknown; idx?: unknown; color?: unknown };
         wsActiveRef.current = true;
+        setWsActive(true);
         const now = Date.now();
         const user = String(a.user ?? "0x0");
         const idx = Number(a.idx ?? 0);
@@ -196,11 +276,13 @@ const Stage: NextPage = () => {
         };
         ws.onclose = () => {
           wsActiveRef.current = false;
+          setWsActive(false);
           if (!closed) retryTimer = setTimeout(connect, 3000);
         };
         ws.onerror = () => ws?.close();
       } catch {
         wsActiveRef.current = false;
+        setWsActive(false);
       }
     };
     connect();
@@ -219,6 +301,7 @@ const Stage: NextPage = () => {
     contractName: "PlaceCanvas",
     eventName: "PixelPlaced",
     onLogs: logs => {
+      if (replayRef.current) return; // 回放模式不混入实时事件
       if (wsActiveRef.current) return;
       const now = Date.now();
       for (const log of logs) {
@@ -245,6 +328,7 @@ const Stage: NextPage = () => {
     contractName: "PlaceCanvas",
     eventName: "CanvasSealed",
     onLogs: logs => {
+      if (replayRef.current) return; // 回放模式不弹实时封盘横幅
       for (const log of logs) {
         setSealed({
           hash: String(log.args.canvasHash ?? ""),
@@ -317,8 +401,36 @@ const Stage: NextPage = () => {
         <span>
           玩家 <b className="text-2xl">{uniquePlayers?.toString() ?? "0"}</b>
         </span>
-        <span className="ml-auto text-2xl text-[#34d399]">TPS {tps.toFixed(1)}</span>
+        {/* WS 徽标：monadLogs 投机订阅激活=⚡实时；断连降级 polling=↻轮询 */}
+        <span className={`ml-auto text-base font-bold ${wsActive ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
+          {wsActive ? "⚡实时" : "↻轮询"}
+        </span>
+        <span className="text-2xl text-[#34d399]">TPS {tps.toFixed(1)}</span>
+        {/* P-A 并行仪表：同块并发 + 整链块吞吐 + 本合约最近 20 块迷你柱状图（数据来自对账循环） */}
+        <ParallelMeter stats={parallelStats} />
         <span className="text-base text-[#94a3b8]">扫码参战 → {playUrl}</span>
+        {/* P-C 回放入口：isSealed 后高亮（终局回放 = L3 数据服务演示）；回放模式下变退出 */}
+        {replayMode ? (
+          <button
+            onClick={() => {
+              window.location.href = "/stage";
+            }}
+            className="px-3 py-1 rounded border border-[#fbbf24] text-[#fbbf24] text-base font-bold cursor-pointer"
+          >
+            ↩ 退出回放
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              window.location.href = "/stage?replay=1";
+            }}
+            className={`px-3 py-1 rounded border text-base font-bold cursor-pointer ${
+              sealed ? "border-[#fbbf24] text-[#fbbf24]" : "border-[#1e2440] text-[#94a3b8]"
+            }`}
+          >
+            ⏪ 回放
+          </button>
+        )}
       </div>
 
       {/* 双层画布：像素层(底) + 特效层(涟漪，覆盖) */}
@@ -358,8 +470,8 @@ const Stage: NextPage = () => {
           </div>
         )}
 
-        {/* 排行榜 */}
-        {top5.length > 0 && (
+        {/* 排行榜（回放模式隐藏：实时排行数据在回放中不更新） */}
+        {!replayMode && top5.length > 0 && (
           <div className="absolute right-4 bottom-4 bg-[#0b0e1dcc] px-4 py-3 rounded-lg text-base">
             <b>🏅 排行榜</b>
             {top5.map(([addr, n], i) => (
@@ -369,6 +481,12 @@ const Stage: NextPage = () => {
             ))}
           </div>
         )}
+
+        {/* P-B 全场合唱（回放模式隐藏，避免与回放进度条抢交互） */}
+        {!replayMode && <MassChorus />}
+
+        {/* P-C 回放引擎：进度条 + 播放/暂停/倍速/重播（回放模式独占） */}
+        {replayMode && <ReplayEngine replayEvent={replayEvent} fastPaint={fastPaint} clearCanvas={clearCanvas} />}
       </div>
     </main>
   );
