@@ -1,0 +1,30 @@
+# dependencies
+node_modules
+
+# yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# eslint
+.eslintcache
+
+# misc
+.DS_Store
+
+# secrets — 绝不提交（部署账户 keystore / 私钥所在）
+.env
+.env.*
+packages/hardhat/.env
+packages/hardhat/.env.*
+*.key
+
+# IDE
+.vscode
+.idea
+
+# cli
+dist
