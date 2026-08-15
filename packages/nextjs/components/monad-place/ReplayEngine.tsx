@@ -185,9 +185,9 @@ const ReplayEngine = ({ replayEvent, fastPaint, clearCanvas }: Props) => {
   };
 
   return (
-    <div className="absolute left-1/2 -translate-x-1/2 bottom-4 z-30 flex items-center gap-3 px-4 py-2 rounded-full bg-[#0b0e1dcc] text-sm whitespace-nowrap">
+    <div className="absolute left-1/2 -translate-x-1/2 bottom-4 z-30 flex items-center gap-3 px-4 py-2 rounded-full bg-mp-surface/80 text-sm whitespace-nowrap">
       {status === "loading" ? (
-        <span className="animate-pulse text-[#94a3b8]">⏪ {loadText}</span>
+        <span className="animate-pulse text-mp-muted">⏪ {loadText}</span>
       ) : (
         <>
           {status === "playing" ? (
@@ -205,10 +205,10 @@ const ReplayEngine = ({ replayEvent, fastPaint, clearCanvas }: Props) => {
             max={Math.max(total - 1, 0)}
             value={cursor}
             onChange={e => controlsRef.current?.seek(Number(e.target.value))}
-            className="w-56 accent-[#a78bfa] cursor-pointer"
+            className="w-56 accent-mp-accent cursor-pointer"
             aria-label="回放进度"
           />
-          <span className="tabular-nums text-[#94a3b8]">
+          <span className="tabular-nums text-mp-muted">
             {cursor}/{total}
           </span>
           <span className="flex gap-2">
@@ -216,14 +216,14 @@ const ReplayEngine = ({ replayEvent, fastPaint, clearCanvas }: Props) => {
               <button
                 key={s}
                 onClick={() => changeSpeed(s)}
-                className={`cursor-pointer ${speed === s ? "text-[#fbbf24] font-bold" : "text-[#94a3b8]"}`}
+                className={`cursor-pointer ${speed === s ? "text-mp-gold font-bold" : "text-mp-muted"}`}
               >
                 {s}x
               </button>
             ))}
           </span>
           {status === "done" && (
-            <button onClick={() => controlsRef.current?.restart()} className="cursor-pointer text-[#a78bfa]">
+            <button onClick={() => controlsRef.current?.restart()} className="cursor-pointer text-mp-accent">
               ⏪ 重播
             </button>
           )}

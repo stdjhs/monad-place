@@ -7,6 +7,38 @@
   --animate-pulse-fast: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* ===== Monad Place 品牌设计令牌（来源：monad-place-frontend/brand-spec.md）===== */
+
+/* OKLch 色板：:root 为唯一色值源（附 hex 注释），CSS 与 Tailwind 令牌共同引用 */
+:root {
+  --mp-bg: oklch(20.509% 0.0697 284.58); /* #151035 深靛蓝场底 */
+  --mp-surface: oklch(23.812% 0.0997 283.86); /* #1C124B 描边紫面板 */
+  --mp-fg: oklch(98.510% 0 89.88); /* #FAFAFA 前景文字 */
+  --mp-muted: oklch(72.912% 0.0446 291.17); /* #A7A3C2 弱化文字 */
+  --mp-border: oklch(98.510% 0 89.88 / 0.15); /* rgba(255,255,255,.15) 面板描边 */
+  --mp-accent: oklch(60.563% 0.2189 292.72); /* #8B5CF6 唯一交互紫 */
+  --mp-gold: oklch(83.686% 0.1644 84.43); /* #FBBF24 金队/活动量 */
+  --mp-ok: oklch(77.294% 0.1535 163.22); /* #34D399 已连接/成功/性能 */
+}
+
+/* Tailwind v4 CSS-first 主题（等价 v3 tailwind.config 的 theme.extend）：
+   生成 bg-mp-* / text-mp-* / border-mp-* 等自定义色工具类 */
+@theme {
+  --color-mp-bg: var(--mp-bg);
+  --color-mp-surface: var(--mp-surface);
+  --color-mp-fg: var(--mp-fg);
+  --color-mp-muted: var(--mp-muted);
+  --color-mp-border: var(--mp-border);
+  --color-mp-accent: var(--mp-accent);
+  --color-mp-gold: var(--mp-gold);
+  --color-mp-ok: var(--mp-ok);
+
+  /* 字体三档：display 场馆标题 / body 正文 / mono 游戏数据·坐标·地址·哈希 */
+  --font-display: "Trebuchet MS", "Microsoft YaHei UI", sans-serif;
+  --font-body: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+}
+
 @plugin "daisyui" {
   themes:
     light,
@@ -117,4 +149,33 @@
 
 .link:hover {
   opacity: 80%;
+}
+
+/* ===== 无障碍基线 ===== */
+
+/* 键盘焦点环：2px 交互紫，仅键盘聚焦时出现（不打扰鼠标点击反馈） */
+:focus-visible {
+  outline: 2px solid var(--mp-accent);
+  outline-offset: 2px;
+}
+
+/* 最小触控目标 44×44px（WCAG 2.5.5），用于小图标按钮等紧凑控件 */
+@utility mp-touch {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* 前庭安全：用户请求减少动效时，全局关闭 CSS 动画/过渡（canvas 涟漪等 JS 动效由渲染层自行尊重该设置） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after,
+  ::backdrop {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
 }
