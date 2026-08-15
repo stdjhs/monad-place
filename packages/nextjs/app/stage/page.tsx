@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { NextPage } from "next";
+import { decodeEventLog, parseAbiItem } from "viem";
 import { usePublicClient } from "wagmi";
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWatchContractEvent } from "~~/hooks/scaffold-eth";
 import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY_COLOR, PALETTE, playNote } from "~~/utils/monad-place";
@@ -47,7 +48,7 @@ const Stage: NextPage = () => {
     if (ripple) ripplesRef.current.push({ x: x + CELL / 2, y: y + CELL / 2, t: performance.now(), color: c });
   };
 
-  // 冷启动：按行拉取链上全量画布
+  // 冷启动：36 行并行拉取链上全量画布（Promise.all，全量出图 ~3s）
   useEffect(() => {
     if (!publicClient || !contractInfo) return;
     (async () => {
@@ -56,24 +57,169 @@ const Stage: NextPage = () => {
         ctx.fillStyle = EMPTY_COLOR;
         ctx.fillRect(0, 0, BOARD_WIDTH * CELL, BOARD_HEIGHT * CELL);
       }
-      for (let y = 0; y < BOARD_HEIGHT; y++) {
-        const row = (await publicClient.readContract({
-          address: contractInfo.address,
-          abi: contractInfo.abi,
-          functionName: "getRow",
-          args: [y],
-        })) as readonly number[];
+      const rows = (await Promise.all(
+        Array.from({ length: BOARD_HEIGHT }, (_, y) =>
+          publicClient.readContract({
+            address: contractInfo.address,
+            abi: contractInfo.abi,
+            functionName: "getRow",
+            args: [y],
+          }),
+        ),
+      )) as (readonly number[])[];
+      rows.forEach((row, y) => {
         for (let x = 0; x < BOARD_WIDTH; x++) if (row[x]) paintCell(y * BOARD_WIDTH + x, Number(row[x]), false);
-      }
+      });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicClient, contractInfo?.address]);
 
-  // 实时落子：像素 + 涟漪 + 音符 + TPS/排行榜
+  // 对账补拉：每 2s 核对块高，遗漏区间按 100 块窗口补像素
+  // （官方公共 RPC eth_getLogs 限 100 块/次；断线重连后大跨度必须分页，否则 -32602 假死）
+  const lastBlockRef = useRef(0n);
+  useEffect(() => {
+    if (!publicClient || !contractInfo) return;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const bn = await publicClient.getBlockNumber();
+        if (lastBlockRef.current === 0n) {
+          lastBlockRef.current = bn; // 首轮只建基线
+          return;
+        }
+        for (let s = lastBlockRef.current + 1n; s <= bn; s += 100n) {
+          const e = s + 99n > bn ? bn : s + 99n;
+          const logs = (await publicClient.getContractEvents({
+            address: contractInfo.address,
+            abi: contractInfo.abi,
+            eventName: "PixelPlaced",
+            fromBlock: s,
+            toBlock: e,
+          })) as { args: { idx?: unknown; color?: unknown } }[];
+          // 只补像素不重复计 TPS/排行（实时通道已计过；paintCell 幂等）
+          logs.forEach(log => paintCell(Number(log.args.idx ?? 0), Number(log.args.color ?? 0), false));
+          lastBlockRef.current = e;
+        }
+      } catch {
+        // RPC 抖动：跳过本轮，2s 后重试
+      }
+    };
+    const id = setInterval(() => {
+      if (!stop) void tick();
+    }, 2000);
+    return () => {
+      stop = true;
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicClient, contractInfo?.address]);
+
+  // 实时通道①（主）：Monad 专属 monadLogs WebSocket 订阅——Proposed 即推，比标准确认早约 1 秒
+  // 实现用浏览器原生 WebSocket + eth_subscribe + viem decodeEventLog（不依赖 viem 的 subscribeLogs 类型）
+  // 断开自动重连（3s），期间 wsActiveRef=false → 下方 polling 通道接管（防 TPS 双计）
+  const wsActiveRef = useRef(false);
+  useEffect(() => {
+    if (!contractInfo) return;
+    const PIXEL_EVENT = parseAbiItem(
+      "event PixelPlaced(address indexed user, uint256 indexed idx, uint8 color, uint8 team, uint256 placedAt)",
+    );
+    let ws: WebSocket | undefined;
+    let subId: string | undefined;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let closed = false;
+
+    const handleLog = (raw: { data?: `0x${string}`; topics?: `0x${string}`[] }) => {
+      try {
+        const topics = raw.topics ?? [];
+        if (topics.length === 0) return;
+        const decoded = decodeEventLog({
+          abi: [PIXEL_EVENT],
+          data: raw.data ?? "0x",
+          topics: [topics[0], ...topics.slice(1)],
+        });
+        if (decoded.eventName !== "PixelPlaced") return;
+        const a = decoded.args as { user?: unknown; idx?: unknown; color?: unknown };
+        wsActiveRef.current = true;
+        const now = Date.now();
+        const user = String(a.user ?? "0x0");
+        const idx = Number(a.idx ?? 0);
+        const c = Number(a.color ?? 0);
+        paintCell(idx, c);
+        playNote(c);
+        recentRef.current.push(now);
+        topRef.current[user] = (topRef.current[user] ?? 0) + 1;
+        recentRef.current = recentRef.current.filter(t => now - t < 5000);
+        setTps(recentRef.current.length / 5);
+        setTop5(
+          Object.entries(topRef.current)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5),
+        );
+      } catch {
+        // 单帧解码失败忽略
+      }
+    };
+
+    const connect = () => {
+      if (closed) return;
+      try {
+        ws = new WebSocket("wss://testnet-rpc.monad.xyz");
+        ws.onopen = () =>
+          ws?.send(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "eth_subscribe",
+              // monadLogs：Monad 专属订阅类型（投机执行，Proposed 即推）
+              params: ["monadLogs", { address: contractInfo.address }],
+            }),
+          );
+        ws.onmessage = ev => {
+          try {
+            const msg = JSON.parse(ev.data as string) as {
+              id?: number;
+              result?: string;
+              method?: string;
+              params?: { subscription?: string; result?: { data?: `0x${string}`; topics?: `0x${string}`[] } };
+            };
+            if (msg.id === 1 && msg.result) {
+              subId = msg.result;
+            } else {
+              const p = msg.params;
+              if (msg.method === "eth_subscription" && p && p.subscription === subId && p.result) {
+                handleLog(p.result);
+              }
+            }
+          } catch {
+            // 非 JSON 帧忽略
+          }
+        };
+        ws.onclose = () => {
+          wsActiveRef.current = false;
+          if (!closed) retryTimer = setTimeout(connect, 3000);
+        };
+        ws.onerror = () => ws?.close();
+      } catch {
+        wsActiveRef.current = false;
+      }
+    };
+    connect();
+
+    return () => {
+      closed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      ws?.close();
+      wsActiveRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractInfo?.address]);
+
+  // 实时通道②（备）：SE2 polling watch——WS 激活时静默，断开时接管（防 TPS 双计）
   useScaffoldWatchContractEvent({
     contractName: "PlaceCanvas",
     eventName: "PixelPlaced",
     onLogs: logs => {
+      if (wsActiveRef.current) return;
       const now = Date.now();
       for (const log of logs) {
         const user = String(log.args.user ?? "0x0");
