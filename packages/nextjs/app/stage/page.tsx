@@ -502,11 +502,11 @@ const Stage: NextPage = () => {
 
         {/* 入场二维码 */}
         {qrOk && qrSrc && (
-          <div className="absolute left-4 bottom-4 bg-white p-2 rounded-lg text-center">
+          <div className="absolute left-4 bottom-4 mp-panel p-2 text-center">
             {/* 二维码为运行时生成的 data URL，next/image 无法优化，豁免 no-img-element 规则 */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={qrSrc} alt="扫码参战二维码" width={160} height={160} onError={() => setQrOk(false)} />
-            <span className="block text-[#0b0e1d] text-sm font-semibold pt-1">📱 扫码参战</span>
+            <span className="block text-mp-fg text-sm font-semibold pt-1">📱 扫码参战</span>
           </div>
         )}
 

@@ -15,6 +15,7 @@
   --color-mp-accent: #8b5cf6; /* 唯一交互紫 */
   --color-mp-gold: #fbbf24; /* 黄金部落（仅敌方阵营使用） */
   --color-mp-ok: #34d399; /* 成功/在线 */
+  --color-mp-canvasbg: #100c29; /* oklch(13% .045 284) 画布专属深底（原型 --canvas-bg） */
   --font-display: "Trebuchet MS", "Microsoft YaHei UI", sans-serif;
   --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
 }
@@ -142,6 +143,24 @@
 .mp-touch {
   min-height: 44px;
   min-width: 44px;
+}
+
+/* 原型面板化外观（brand-spec 观测规则 1）：surface 面 + 15% 白边 + 12px 面板圆角 */
+.mp-panel {
+  background: var(--color-mp-surface);
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 12px;
+}
+/* 控件圆角 8px + 立即反馈 100ms（规则 5） */
+.mp-btn {
+  border-radius: 8px;
+  transition:
+    background-color 100ms,
+    border-color 100ms,
+    transform 100ms;
+}
+.mp-btn:active {
+  transform: scale(0.97);
 }
 
 /* 减少动态：关闭动画与涟漪类特效（眩晕症友好） */

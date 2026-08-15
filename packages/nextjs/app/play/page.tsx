@@ -193,23 +193,25 @@ const Play: NextPage = () => {
     );
 
   return (
-    <main className="flex flex-col items-center pt-4 pb-8 px-3 min-h-screen">
-      {/* M5 入场态顶条：live / expired / sealed（图标=非颜色线索） */}
+    <main className="flex flex-col items-center pt-4 pb-8 px-3 min-h-screen bg-mp-bg text-mp-fg">
+      {/* M5 入场态顶条：live / expired / sealed（图标=非颜色线索；原型 Entry 状态条样式） */}
       <div
-        className={`w-full max-w-2xl text-center text-sm py-1.5 rounded-full mb-1 ${
-          isSealed ? "bg-mp-surface text-mp-muted" : expired ? "bg-mp-surface text-mp-gold" : "bg-mp-surface text-mp-ok"
+        className={`w-full max-w-2xl text-center text-sm py-1.5 rounded-full mb-1 border ${
+          isSealed ? "mp-panel text-mp-muted" : expired ? "mp-panel text-mp-gold" : "mp-panel text-mp-ok"
         }`}
       >
         {isSealed ? "🏁 已封盘 · 指纹已上链" : expired ? "⏰ 比赛时间已到" : "🟢 战斗进行中 · 扫码即参战"}
       </div>
-      <h1 className="text-2xl font-bold">
-        Monad Place <span className="text-violet-500">紫晶</span> vs <span className="text-amber-500">黄金</span>
+      <h1 className="text-2xl font-bold font-display mt-1">
+        Monad Place <span className="text-mp-accent">紫晶</span> vs <span className="text-mp-gold">黄金</span>
       </h1>
 
-      {/* 阵营选择 */}
-      <div className="flex gap-3 mt-3">
+      {/* 阵营选择（原型 team-selector：面板化 + 8px 控件圆角 + 100ms 反馈） */}
+      <div className="mp-panel flex gap-3 mt-3 px-4 py-3">
         <button
-          className={`btn btn-sm ${team === 1 ? "btn-primary" : "btn-outline"}`}
+          className={`mp-btn mp-touch px-4 text-sm font-bold border ${
+            team === 1 ? "bg-mp-accent text-white border-transparent" : "border-white/15 text-mp-muted"
+          }`}
           onClick={() => {
             setTeam(1);
             setColor(1);
@@ -218,7 +220,9 @@ const Play: NextPage = () => {
           🟣 紫晶军团
         </button>
         <button
-          className={`btn btn-sm ${team === 2 ? "btn-warning" : "btn-outline"}`}
+          className={`mp-btn mp-touch px-4 text-sm font-bold border ${
+            team === 2 ? "bg-mp-gold text-mp-bg border-transparent" : "border-white/15 text-mp-muted"
+          }`}
           onClick={() => {
             setTeam(2);
             setColor(9);
@@ -228,36 +232,38 @@ const Play: NextPage = () => {
         </button>
       </div>
 
-      {/* 当前阵营调色板 */}
-      <div className="flex gap-1.5 mt-3 flex-wrap justify-center">
+      {/* 当前阵营调色板（原型 color-palette：44px 触控 + 8px 圆角） */}
+      <div className="mp-panel flex gap-2 mt-3 px-4 py-3 flex-wrap justify-center">
         {colors.map(c => (
           <button
             key={c}
             aria-label={`颜色 ${c}`}
             onClick={() => setColor(c)}
-            className={`w-9 h-9 rounded-md border-2 ${color === c ? "border-white scale-110" : "border-transparent"}`}
+            className={`mp-btn w-11 h-11 border-2 ${color === c ? "border-white scale-110" : "border-transparent"}`}
             style={{ backgroundColor: PALETTE[c] ?? EMPTY_COLOR }}
           />
         ))}
       </div>
 
-      {/* 画布：点击落子，每格 = 1 笔交易 */}
-      <canvas
-        ref={canvasRef}
-        width={BOARD_WIDTH * CELL}
-        height={BOARD_HEIGHT * CELL}
-        onClick={onCanvasClick}
-        className="w-full max-w-2xl mt-4 rounded-lg cursor-crosshair"
-        style={{
-          aspectRatio: "64/36",
-          imageRendering: "pixelated",
-          background: EMPTY_COLOR,
-          touchAction: "manipulation",
-        }}
-      />
+      {/* 画布：点击落子，每格 = 1 笔交易（原型 canvas 近黑专属底 --canvas-bg） */}
+      <div className="mp-panel p-2 w-full max-w-2xl mt-4">
+        <canvas
+          ref={canvasRef}
+          width={BOARD_WIDTH * CELL}
+          height={BOARD_HEIGHT * CELL}
+          onClick={onCanvasClick}
+          className="w-full rounded-lg cursor-crosshair"
+          style={{
+            aspectRatio: "64/36",
+            imageRendering: "pixelated",
+            background: EMPTY_COLOR,
+            touchAction: "manipulation",
+          }}
+        />
+      </div>
 
       {/* 状态行：冷却期显示 radial-progress 环形进度（daisyui），其余显示文字状态 */}
-      <div className="mt-3 min-h-14 flex flex-col items-center justify-center gap-2 text-sm">
+      <div className="mp-panel mt-3 min-h-14 px-4 py-2 flex flex-col items-center justify-center gap-2 text-sm w-full max-w-2xl">
         {isSealed ? (
           <span>🏁 比赛已封盘，画布指纹已上链</span>
         ) : cdLeft > 0 ? (
@@ -282,12 +288,21 @@ const Play: NextPage = () => {
           <span>{status}</span>
         )}
         {/* 观看模式入口：大屏投影页（合唱 / 并行仪表 / 回放都在那里） */}
-        <a href="/stage" target="_blank" rel="noreferrer" className="btn btn-xs btn-outline gap-1">
+        <a
+          href="/stage"
+          target="_blank"
+          rel="noreferrer"
+          className="mp-btn text-xs text-mp-muted border border-white/15 px-3 py-1.5 font-bold"
+        >
           📺 观看大屏模式
         </a>
       </div>
       {isHost && !isSealed && (
-        <button className="btn btn-error btn-sm mt-2 mp-touch" onClick={() => setConfirmSeal(true)} disabled={busy}>
+        <button
+          className="mp-btn mp-touch mt-2 px-5 text-sm font-bold text-white bg-red-600 border border-red-400/40"
+          onClick={() => setConfirmSeal(true)}
+          disabled={busy}
+        >
           🏁 主持人封盘
         </button>
       )}
@@ -300,7 +315,7 @@ const Play: NextPage = () => {
           aria-modal="true"
           aria-label="确认封盘"
         >
-          <div className="bg-mp-surface border border-white/15 rounded-xl p-6 max-w-sm w-full text-center">
+          <div className="mp-panel p-6 max-w-sm w-full text-center">
             <h2 className="text-lg font-bold mb-2">冻结整幅画布？</h2>
             <p className="text-sm opacity-80 mb-1">
               seal() <b>不可逆</b>：将停止一切落子，并对当前 2304 格生成永久 keccak256 链上指纹。
