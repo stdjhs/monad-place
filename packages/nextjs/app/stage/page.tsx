@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { NextPage } from "next";
 import { decodeEventLog, parseAbiItem } from "viem";
 import { usePublicClient } from "wagmi";
+import MassChorus from "~~/components/monad-place/MassChorus";
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWatchContractEvent } from "~~/hooks/scaffold-eth";
 import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY_COLOR, PALETTE, playNote } from "~~/utils/monad-place";
 
@@ -369,6 +370,9 @@ const Stage: NextPage = () => {
             ))}
           </div>
         )}
+
+        {/* P-B 全场合唱：倒计时 → 3s 窗口 → 链上对账战报（自包含组件，按钮与覆盖层均 fixed 定位） */}
+        <MassChorus />
       </div>
     </main>
   );
