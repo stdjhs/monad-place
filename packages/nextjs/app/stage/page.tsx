@@ -13,6 +13,11 @@ import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY_COLOR, PALETTE, playNote } from "~~/ut
 
 type Ripple = { x: number; y: number; t: number; color: number };
 
+// TODO(mp-tokens)：设计工位 tokens 落地后，按下表把本页任意值色替换为 tokens 类名（视觉真值=monad-place-frontend/brand-spec.md）：
+//   bg-[#151035]→bg-mp-bg   bg-[#1C124B]→bg-mp-surface   text-[#FAFAFA]→text-mp-fg
+//   text-[#A7A3C2]→text-mp-muted   border-white/15→border-mp-border
+//   text-[#8B5CF6]→text-mp-accent   text-[#FBBF24]→text-mp-gold   text-[#34D399]→text-mp-success
+
 // 大屏端（投影用）：像素层 + 特效层双层画布（涟漪不留残影）+ 五声音阶 + TPS 仪表 + 阵营比分 + 排行榜 + 封盘横幅 + 入场二维码
 // 只读无需钱包；比分/统计以链上数据为准（每秒轮询，杜绝本地计数漂移）
 const Stage: NextPage = () => {
@@ -27,6 +32,9 @@ const Stage: NextPage = () => {
     contractName: "PlaceCanvas",
     functionName: "uniquePlayers",
   });
+  // 终局三态真值：顶条 live/expired/sealed 判定与封盘横幅重建共用（与 play 页同源读法）
+  const { data: isSealed } = useScaffoldReadContract({ contractName: "PlaceCanvas", functionName: "isSealed" });
+  const { data: endAt } = useScaffoldReadContract({ contractName: "PlaceCanvas", functionName: "endAt" });
 
   // 本地实时数据：TPS（5s 滑动窗口）与排行榜（placedCount 只增不减，无漂移问题）
   const recentRef = useRef<number[]>([]);
@@ -34,6 +42,17 @@ const Stage: NextPage = () => {
   const [tps, setTps] = useState(0);
   const [top5, setTop5] = useState<[string, number][]>([]);
   const [sealed, setSealed] = useState<{ hash: string; total: string; players: string } | null>(null);
+
+  // Stage 状态层（Tech-Spec 5 态）：loading=冷启动同步中 / empty=空画布 / retry=对账追赶中；sealed 复用下方横幅
+  const [coldLoading, setColdLoading] = useState(true);
+  const [catchingUp, setCatchingUp] = useState(false);
+  // 本地秒级时钟：驱动 expired 判定与 LIVE 倒计时（初始 0=未知，保证 SSR/客户端首帧一致，不判过期）
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    setNow(Math.floor(Date.now() / 1000));
+    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // P-C 回放模式：?replay=1 进入（ref+state 双轨：ref 供下方各实时 effect 守卫，state 供渲染）
   const [replayMode, setReplayMode] = useState(false);
@@ -88,8 +107,12 @@ const Stage: NextPage = () => {
 
   // 冷启动：36 行并行拉取链上全量画布（Promise.all，全量出图 ~3s）；回放模式自带冷启动（从空白重演）
   useEffect(() => {
-    if (replayRef.current) return;
+    if (replayRef.current) {
+      setColdLoading(false); // 回放从空白重演，不走链上冷启动遮罩
+      return;
+    }
     if (!publicClient || !contractInfo) return;
+    setColdLoading(true);
     (async () => {
       const ctx = baseRef.current?.getContext("2d");
       if (ctx) {
@@ -109,7 +132,8 @@ const Stage: NextPage = () => {
       rows.forEach((row, y) => {
         for (let x = 0; x < BOARD_WIDTH; x++) if (row[x]) paintCell(y * BOARD_WIDTH + x, Number(row[x]), false);
       });
-    })();
+      setColdLoading(false);
+    })().catch(() => setColdLoading(false)); // RPC 失败也解除遮罩，维持原有"空白画布"降级行为
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicClient, contractInfo?.address]);
 
@@ -147,6 +171,9 @@ const Stage: NextPage = () => {
           lastBlockRef.current = bn; // 首轮只建基线
           return;
         }
+        // 对账追赶态（Stage retry）：积压超一个补拉窗口（100 块）= 断线/休眠后大跨度分页，提示右上角；常规 2s 补拉一页内瞬间完成不提示
+        const catching = bn - lastBlockRef.current > 100n;
+        if (catching) setCatchingUp(true);
         for (let s = lastBlockRef.current + 1n; s <= bn; s += 100n) {
           const e = s + 99n > bn ? bn : s + 99n;
           const logs = (await publicClient.getContractEvents({
@@ -166,6 +193,7 @@ const Stage: NextPage = () => {
           });
           lastBlockRef.current = e;
         }
+        setCatchingUp(false); // 补拉完成解除追赶提示（异常中断则保留，恢复后下一轮解除）
         // 输出并行仪表快照：修剪旧块后取最近 20 个有事件块 + 最新整链采样
         const entries = Array.from(perBlockMapRef.current.entries()).sort((a, b) =>
           a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
@@ -339,6 +367,29 @@ const Stage: NextPage = () => {
     },
   });
 
+  // 封盘横幅重建：事件只推一次，大屏刷新即丢——用 isSealed 真值 + canvasHash view 调用补齐（与事件路径同一横幅）
+  useEffect(() => {
+    if (replayRef.current) return; // 回放模式保持无横幅（进度条交互优先，与事件路径守卫一致）
+    if (!isSealed || sealed || !publicClient || !contractInfo) return;
+    (async () => {
+      try {
+        const hash = await publicClient.readContract({
+          address: contractInfo.address,
+          abi: contractInfo.abi,
+          functionName: "canvasHash",
+        });
+        setSealed({
+          hash: String(hash),
+          total: (totalPlaced ?? 0n).toString(),
+          players: (uniquePlayers ?? 0n).toString(),
+        });
+      } catch {
+        // 读指纹失败：不弹横幅（顶条 sealed 态仍如实显示）
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSealed, publicClient, contractInfo?.address, sealed]);
+
   // 涟漪动画：特效层每帧清空重画，不污染像素层
   useEffect(() => {
     let raf = 0;
@@ -380,20 +431,26 @@ const Stage: NextPage = () => {
     [playUrl],
   );
 
+  // 顶条三态判定（与 play 页同源：isSealed/endAt）：sealed > expired（到时未封）> live
+  const endAtSec = endAt !== undefined ? Number(endAt) : 0;
+  const phase = isSealed ? "sealed" : endAtSec > 0 && now > endAtSec ? "expired" : "live";
+  const liveLeft = phase === "live" && now > 0 && endAtSec > now ? endAtSec - now : 0; // now=0（首帧）不出倒计时
+  const countdown = `${String(Math.floor(liveLeft / 60)).padStart(2, "0")}:${String(liveLeft % 60).padStart(2, "0")}`;
+
   if (!contractInfo)
     return (
       <main className="flex items-center justify-center min-h-screen text-lg">合约尚未部署：请先 yarn deploy</main>
     );
 
   return (
-    <main className="flex flex-col h-screen bg-[#05060f] text-[#e2e8f0] overflow-hidden">
+    <main className="flex flex-col h-screen bg-[#151035] text-[#FAFAFA] overflow-hidden">
       {/* HUD：比分与统计直接读链上真值 */}
-      <div className="flex items-center gap-6 px-6 py-3 bg-[#0b0e1d] border-b border-[#1e2440] text-xl shrink-0">
+      <div className="flex items-center gap-6 px-6 py-3 bg-[#1C124B] border-b border-white/15 text-xl shrink-0">
         <span>
-          紫晶军团 <b className="text-[#a78bfa] text-2xl">{t1?.toString() ?? "0"}</b>
+          紫晶军团 <b className="text-[#8B5CF6] text-2xl">{t1?.toString() ?? "0"}</b>
         </span>
         <span>
-          黄金部落 <b className="text-[#fbbf24] text-2xl">{t2?.toString() ?? "0"}</b>
+          黄金部落 <b className="text-[#FBBF24] text-2xl">{t2?.toString() ?? "0"}</b>
         </span>
         <span>
           总交易 <b className="text-2xl">{totalPlaced?.toString() ?? "0"}</b>
@@ -401,21 +458,40 @@ const Stage: NextPage = () => {
         <span>
           玩家 <b className="text-2xl">{uniquePlayers?.toString() ?? "0"}</b>
         </span>
+        {/* 比赛状态三态徽标（与 play 页同源判定 isSealed/endAt）：大屏字号加大，游戏数据用 mono 等宽 */}
+        <span className="ml-auto flex items-center gap-2 font-mono tabular-nums text-2xl font-bold">
+          {phase === "sealed" ? (
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#A7A3C2]" />
+              已封盘
+            </span>
+          ) : phase === "expired" ? (
+            <span className="flex items-center gap-2 text-[#FBBF24]">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FBBF24]" />
+              已到时 · 待封盘
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 text-[#34D399]">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#34D399] animate-pulse" />
+              LIVE{liveLeft > 0 ? ` · ${countdown}` : ""}
+            </span>
+          )}
+        </span>
         {/* WS 徽标：monadLogs 投机订阅激活=⚡实时；断连降级 polling=↻轮询 */}
-        <span className={`ml-auto text-base font-bold ${wsActive ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
+        <span className={`text-base font-bold ${wsActive ? "text-[#34D399]" : "text-[#FBBF24]"}`}>
           {wsActive ? "⚡实时" : "↻轮询"}
         </span>
-        <span className="text-2xl text-[#34d399]">TPS {tps.toFixed(1)}</span>
+        <span className="text-2xl text-[#34D399] font-mono tabular-nums">TPS {tps.toFixed(1)}</span>
         {/* P-A 并行仪表：同块并发 + 整链块吞吐 + 本合约最近 20 块迷你柱状图（数据来自对账循环） */}
         <ParallelMeter stats={parallelStats} />
-        <span className="text-base text-[#94a3b8]">扫码参战 → {playUrl}</span>
-        {/* P-C 回放入口：isSealed 后高亮（终局回放 = L3 数据服务演示）；回放模式下变退出 */}
+        <span className="text-base text-[#A7A3C2]">扫码参战 → {playUrl}</span>
+        {/* P-C 回放入口：isSealed 真值高亮（终局回放 = L3 数据服务演示，刷新后仍亮）；回放模式下变退出 */}
         {replayMode ? (
           <button
             onClick={() => {
               window.location.href = "/stage";
             }}
-            className="px-3 py-1 rounded border border-[#fbbf24] text-[#fbbf24] text-base font-bold cursor-pointer"
+            className="px-3 py-1 rounded border border-[#FBBF24] text-[#FBBF24] text-base font-bold cursor-pointer"
           >
             ↩ 退出回放
           </button>
@@ -425,7 +501,7 @@ const Stage: NextPage = () => {
               window.location.href = "/stage?replay=1";
             }}
             className={`px-3 py-1 rounded border text-base font-bold cursor-pointer ${
-              sealed ? "border-[#fbbf24] text-[#fbbf24]" : "border-[#1e2440] text-[#94a3b8]"
+              sealed || isSealed ? "border-[#FBBF24] text-[#FBBF24]" : "border-white/15 text-[#A7A3C2]"
             }`}
           >
             ⏪ 回放
@@ -451,11 +527,34 @@ const Stage: NextPage = () => {
           />
         </div>
 
+        {/* 状态遮罩 · loading 态（冷启动同步中）：画布中央提示（原型 canvas-state 盒样式） */}
+        {!replayMode && coldLoading && (
+          <div className="absolute inset-0 grid place-items-center bg-[#151035e6]" role="status">
+            <div className="px-4 py-3 rounded-lg border border-white/15 bg-[#151035] text-center text-2xl font-bold">
+              正在同步画布…
+            </div>
+          </div>
+        )}
+
+        {/* 状态遮罩 · empty 态（链上零落子）：呼吸提示等待第一笔交易（totalPlaced 为 bigint 真值） */}
+        {!replayMode && !coldLoading && totalPlaced === 0n && (
+          <div className="absolute inset-0 grid place-items-center" role="status">
+            <div className="px-4 py-3 rounded-lg border border-white/15 bg-[#151035] text-center text-2xl font-bold animate-pulse">
+              等待第一笔交易…
+            </div>
+          </div>
+        )}
+
+        {/* 状态提示 · retry 态（对账追赶中）：分页补拉积压块期间右上小字 */}
+        {catchingUp && (
+          <div className="absolute right-4 top-4 font-mono text-sm text-[#A7A3C2] animate-pulse">追赶区块中…</div>
+        )}
+
         {/* 封盘横幅 */}
         {sealed && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#05060fd9] text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#151035e6] text-center">
             <h1 className="text-5xl font-bold">🏁 画布已上链</h1>
-            <p className="mt-4 font-mono text-xl text-[#34d399] break-all max-w-[80%]">{sealed.hash}</p>
+            <p className="mt-4 font-mono text-xl text-[#34D399] break-all max-w-[80%]">{sealed.hash}</p>
             <p className="mt-3 text-xl">
               {sealed.players} 名玩家 · {sealed.total} 笔交易 · 永久上链
             </p>
@@ -466,13 +565,13 @@ const Stage: NextPage = () => {
         {qrOk && qrSrc && (
           <div className="absolute left-4 bottom-4 bg-white p-2 rounded-lg text-center">
             <img src={qrSrc} alt="扫码参战二维码" width={160} height={160} onError={() => setQrOk(false)} />
-            <span className="block text-[#0b0e1d] text-sm font-semibold pt-1">📱 扫码参战</span>
+            <span className="block text-[#151035] text-sm font-semibold pt-1">📱 扫码参战</span>
           </div>
         )}
 
         {/* 排行榜（回放模式隐藏：实时排行数据在回放中不更新） */}
         {!replayMode && top5.length > 0 && (
-          <div className="absolute right-4 bottom-4 bg-[#0b0e1dcc] px-4 py-3 rounded-lg text-base">
+          <div className="absolute right-4 bottom-4 bg-[#1C124Be6] px-4 py-3 rounded-lg text-base">
             <b>🏅 排行榜</b>
             {top5.map(([addr, n], i) => (
               <div key={addr}>
