@@ -1,0 +1,19 @@
+{
+  "name": "Monad Place — Sealed Canvas #{id}",
+  "description": "千人链上像素战争的终局纪念品。这幅 64×36 的共享画布由全场玩家在同一时段共同落子绘制，每一个像素都是一笔真实的 Monad 交易；主持人调用 seal() 冻结画布后，整幅作品的 keccak256 指纹永久上链。本 NFT 携带 5% 创作者分成（ERC-2981），metadata 记录当场的画布指纹与参与数据——你参与的历史被压缩进一个可转售的链上资产。",
+  "image": "https://monad.ccwu.cc/og.png",
+  "external_url": "https://monad.ccwu.cc/stage?replay=1",
+  "canvasHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "players": 0,
+  "totalPlaced": 0,
+  "sealedAtBlock": 0,
+  "network": "monad-testnet",
+  "attributes": [
+    { "trait_type": "Canvas Size", "value": "64x36" },
+    { "trait_type": "Players", "value": 0 },
+    { "trait_type": "Total Placed", "value": 0 },
+    { "trait_type": "Royalty", "value": "5%" },
+    { "trait_type": "Standard", "value": "ERC-1155 + ERC-2981" },
+    { "trait_type": "Network", "value": "Monad Testnet" }
+  ]
+}
