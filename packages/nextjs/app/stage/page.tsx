@@ -158,6 +158,7 @@ const Stage: NextPage = () => {
   // 实现用浏览器原生 WebSocket + eth_subscribe + viem decodeEventLog（不依赖 viem 的 subscribeLogs 类型）
   // 断开自动重连（3s），期间 wsActiveRef=false → 下方 polling 通道接管（防 TPS 双计）
   const wsActiveRef = useRef(false);
+  const [wsActive, setWsActive] = useState(false); // 徽标渲染态：⚡实时 / ↻轮询
   useEffect(() => {
     if (!contractInfo) return;
     const PIXEL_EVENT = parseAbiItem(
@@ -180,6 +181,7 @@ const Stage: NextPage = () => {
         if (decoded.eventName !== "PixelPlaced") return;
         const a = decoded.args as { user?: unknown; idx?: unknown; color?: unknown };
         wsActiveRef.current = true;
+        setWsActive(true);
         const now = Date.now();
         const user = String(a.user ?? "0x0");
         const idx = Number(a.idx ?? 0);
@@ -236,11 +238,13 @@ const Stage: NextPage = () => {
         };
         ws.onclose = () => {
           wsActiveRef.current = false;
+          setWsActive(false);
           if (!closed) retryTimer = setTimeout(connect, 3000);
         };
         ws.onerror = () => ws?.close();
       } catch {
         wsActiveRef.current = false;
+        setWsActive(false);
       }
     };
     connect();
@@ -357,7 +361,11 @@ const Stage: NextPage = () => {
         <span>
           玩家 <b className="text-2xl">{uniquePlayers?.toString() ?? "0"}</b>
         </span>
-        <span className="ml-auto text-2xl text-[#34d399]">TPS {tps.toFixed(1)}</span>
+        {/* WS 徽标：monadLogs 投机订阅激活=⚡实时；断连降级 polling=↻轮询 */}
+        <span className={`ml-auto text-base font-bold ${wsActive ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
+          {wsActive ? "⚡实时" : "↻轮询"}
+        </span>
+        <span className="text-2xl text-[#34d399]">TPS {tps.toFixed(1)}</span>
         {/* P-A 并行仪表：同块并发 + 整链块吞吐 + 本合约最近 20 块迷你柱状图（数据来自对账循环） */}
         <ParallelMeter stats={parallelStats} />
         <span className="text-base text-[#94a3b8]">扫码参战 → {playUrl}</span>
