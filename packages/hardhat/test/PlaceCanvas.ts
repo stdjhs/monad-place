@@ -75,4 +75,38 @@ describe("PlaceCanvas", function () {
     expect(await placeCanvas.teamPixels(1)).to.equal(0n);
     expect(await placeCanvas.teamPixels(2)).to.equal(1n);
   });
+
+  it("同一玩家多次落子，uniquePlayers 只计一次", async function () {
+    const { placeCanvas } = await networkHelpers.loadFixture(deployFixture);
+    await placeCanvas.place(8, 8, 5);
+    await networkHelpers.time.increase(5);
+    await placeCanvas.place(9, 9, 6);
+    expect(await placeCanvas.totalPlaced()).to.equal(2n);
+    expect(await placeCanvas.uniquePlayers()).to.equal(1n);
+  });
+
+  it("覆盖己方同阵营异色格，teamPixels 净变化为 0", async function () {
+    const { placeCanvas } = await networkHelpers.loadFixture(deployFixture);
+    await placeCanvas.place(10, 10, 5); // 紫晶色 5
+    await networkHelpers.time.increase(5);
+    await placeCanvas.place(10, 10, 6); // 换紫晶色 6（同阵营）
+    expect(await placeCanvas.teamPixels(1)).to.equal(1n); // 净 0：先 -1 后 +1
+    expect(await placeCanvas.totalPlaced()).to.equal(2n); // 但总落子次数 +1
+  });
+
+  it("canvasHash 确定性：状态不变则哈希不变，落子后变化", async function () {
+    const { placeCanvas } = await networkHelpers.loadFixture(deployFixture);
+    await placeCanvas.place(11, 11, 5);
+    const h1 = await placeCanvas.canvasHash();
+    expect(await placeCanvas.canvasHash()).to.equal(h1); // 确定性
+    await networkHelpers.time.increase(5);
+    await placeCanvas.place(12, 12, 9);
+    expect(await placeCanvas.canvasHash()).to.not.equal(h1); // 对状态敏感
+  });
+
+  it("超过 endAt 自然到期后落子被拒绝（NotLive）", async function () {
+    const { placeCanvas } = await networkHelpers.loadFixture(deployFixture);
+    await networkHelpers.time.increase(28801); // 越过 liveSeconds=28800
+    await expect(placeCanvas.place(13, 13, 5)).to.be.revertedWithCustomError(placeCanvas, "NotLive");
+  });
 });
