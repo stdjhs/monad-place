@@ -1,0 +1,632 @@
+{
+  "address": "0xb75647c8d80b9c0a5f7edb666ba5bf3b78974514",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "liveSeconds_",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "BadColor",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "Cooldown",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotLive",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "SameColor",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "canvasHash",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalPlaced",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "uniquePlayers",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "sealedAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "CanvasSealed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "idx",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "color",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "team",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "placedAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "PixelPlaced",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "HEIGHT",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "PALETTE",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "TEAM_SPLIT",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "WIDTH",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "canvasHash",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "cooldownSeconds",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "endAt",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "y",
+          "type": "uint8"
+        }
+      ],
+      "name": "getRow",
+      "outputs": [
+        {
+          "internalType": "uint8[64]",
+          "name": "row",
+          "type": "uint8[64]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "isSealed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "lastPlacedAt",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "pixels",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint16",
+          "name": "x",
+          "type": "uint16"
+        },
+        {
+          "internalType": "uint16",
+          "name": "y",
+          "type": "uint16"
+        },
+        {
+          "internalType": "uint8",
+          "name": "color",
+          "type": "uint8"
+        }
+      ],
+      "name": "place",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "placedCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "seal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "startAt",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "color",
+          "type": "uint8"
+        }
+      ],
+      "name": "teamOf",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "name": "teamPixels",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalPlaced",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "uniquePlayers",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "contractName": "PlaceCanvas",
+  "sourceName": "contracts/PlaceCanvas.sol",
+  "bytecode": "0x60c06040526003600255348015610014575f5ffd5b50604051610a70380380610a7083398101604081905261003391610050565b3360a052426080819052610048908290610067565b5f555061008c565b5f60208284031215610060575f5ffd5b5051919050565b8082018082111561008657634e487b7160e01b5f52601160045260245ffd5b92915050565b60805160a0516109bc6100b45f395f8181610228015261044d01525f6102a301526109bc5ff3fe608060405234801561000f575f5ffd5b5060043610610126575f3560e01c80637cc3ae8c116100a9578063ab1374841161006e578063ab1374841461028d578063b8221bc414610295578063c74465651461029e578063d44d3394146102c5578063d5f47cca146102cd575f5ffd5b80637cc3ae8c14610213578063868dc8c11461021b5780638da5cb5b146102235780638da7f23214610262578063a41e7c7414610284575f5ffd5b806341c5e4c0116100ef57806341c5e4c01461019d578063527d7053146101bc578063631f9852146101db57806369ea80d5146101f857806376105f5814610200575f5ffd5b80622078751461012a57806313ede8e31461014657806321d98a1d1461016b57806331e674de1461018b5780633fb27b8514610193575b5f5ffd5b61013360045481565b6040519081526020015b60405180910390f35b6101596101543660046107fe565b6102ec565b60405160ff909116815260200161013d565b61017e6101793660046107fe565b610309565b60405161013d919061081e565b61013361037b565b61019b610442565b005b6101336101ab366004610852565b60066020525f908152604090205481565b6101336101ca3660046107fe565b60086020525f908152604090205481565b6001546101e89060ff1681565b604051901515815260200161013d565b610133602481565b61019b61020e366004610889565b610531565b6101335f5481565b610133601081565b61024a7f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b03909116815260200161013d565b6101596102703660046108c9565b60056020525f908152604090205460ff1681565b61013360035481565b610133600881565b61013360025481565b6101337f000000000000000000000000000000000000000000000000000000000000000081565b610133604081565b6101336102db366004610852565b60076020525f908152604090205481565b5f60088260ff161115610300576002610303565b60015b92915050565b6103116107ca565b5f5b60408110156103755760055f8261032e604060ff88166108f4565b610338919061090b565b8152602081019190915260409081015f205460ff16908390839081106103605761036061091e565b60ff9092166020929092020152600101610313565b50919050565b5f80610389602460406108f4565b67ffffffffffffffff8111156103a1576103a1610932565b6040519080825280601f01601f1916602001820160405280156103cb576020820181803683370190505b5090505f5b6103dc602460406108f4565b811015610434575f81815260056020526040902054825160f89190911b6001600160f81b031916908390839081106104165761041661091e565b60200101906001600160f81b03191690815f1a9053506001016103d0565b508051602090910120919050565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146104a95760405162461bcd60e51b81526020600482015260086024820152671b9bdd081a1bdcdd60c21b604482015260640160405180910390fd5b60015460ff16156104cd5760405163baf13b3f60e01b815260040160405180910390fd5b6001805460ff191681179055425f557fee6c4263b20ac9f11ba6da8a81ae2b29b4d099b52d853e1b8774cef1f664a7a361050561037b565b6003546004546040805193845260208401929092529082015242606082015260800160405180910390a1565b60015460ff168061054257505f5442115b156105605760405163baf13b3f60e01b815260040160405180910390fd5b60ff81161580610573575060108160ff16115b15610591576040516345f1af8960e01b815260040160405180910390fd5b600254335f908152600660205260409020546105ad9042610946565b10156105cc5760405163b0782df760e01b815260040160405180910390fd5b60408361ffff161015806105e5575060248261ffff1610155b15610603576040516345f1af8960e01b815260040160405180910390fd5b5f8361ffff1660408461ffff1661061a91906108f4565b610624919061090b565b5f8181526005602052604090205490915060ff80841691160361065a576040516358bf424160e01b815260040160405180910390fd5b335f9081526009602052604090205460ff1661069d57335f908152600960205260408120805460ff19166001179055600480549161069783610959565b91905055505b5f8181526005602052604090205460ff1680156106e65760085f6106c0836102ec565b60ff16815260208101919091526040015f9081208054916106e083610971565b91905055505b5f828152600560205260408120805460ff191660ff861617905560089061070c856102ec565b60ff16815260208101919091526040015f90812080549161072c83610959565b9091555050335f9081526006602090815260408083204290556007909152812080549161075883610959565b909155505060038054905f61076c83610959565b90915550829050337f06ccb49a091d489f63abf0e9b370de8a7899e0ddb81b35804f88d815768986538561079f816102ec565b6040805160ff9384168152929091166020830152429082015260600160405180910390a35050505050565b6040518061080001604052806040906020820280368337509192915050565b803560ff811681146107f9575f5ffd5b919050565b5f6020828403121561080e575f5ffd5b610817826107e9565b9392505050565b610800810181835f5b604081101561084957815160ff16835260209283019290910190600101610827565b50505092915050565b5f60208284031215610862575f5ffd5b81356001600160a01b0381168114610817575f5ffd5b803561ffff811681146107f9575f5ffd5b5f5f5f6060848603121561089b575f5ffd5b6108a484610878565b92506108b260208501610878565b91506108c0604085016107e9565b90509250925092565b5f602082840312156108d9575f5ffd5b5035919050565b634e487b7160e01b5f52601160045260245ffd5b8082028115828204841417610303576103036108e0565b80820180821115610303576103036108e0565b634e487b7160e01b5f52603260045260245ffd5b634e487b7160e01b5f52604160045260245ffd5b81810381811115610303576103036108e0565b5f6001820161096a5761096a6108e0565b5060010190565b5f8161097f5761097f6108e0565b505f19019056fea2646970667358221220de4b03d1f23ef364f6dc2c9abb0e9cd8e539ff50734fbdcbf5ba613d90a0224d64736f6c634300081e0033",
+  "deployedBytecode": "0x608060405234801561000f575f5ffd5b5060043610610126575f3560e01c80637cc3ae8c116100a9578063ab1374841161006e578063ab1374841461028d578063b8221bc414610295578063c74465651461029e578063d44d3394146102c5578063d5f47cca146102cd575f5ffd5b80637cc3ae8c14610213578063868dc8c11461021b5780638da5cb5b146102235780638da7f23214610262578063a41e7c7414610284575f5ffd5b806341c5e4c0116100ef57806341c5e4c01461019d578063527d7053146101bc578063631f9852146101db57806369ea80d5146101f857806376105f5814610200575f5ffd5b80622078751461012a57806313ede8e31461014657806321d98a1d1461016b57806331e674de1461018b5780633fb27b8514610193575b5f5ffd5b61013360045481565b6040519081526020015b60405180910390f35b6101596101543660046107fe565b6102ec565b60405160ff909116815260200161013d565b61017e6101793660046107fe565b610309565b60405161013d919061081e565b61013361037b565b61019b610442565b005b6101336101ab366004610852565b60066020525f908152604090205481565b6101336101ca3660046107fe565b60086020525f908152604090205481565b6001546101e89060ff1681565b604051901515815260200161013d565b610133602481565b61019b61020e366004610889565b610531565b6101335f5481565b610133601081565b61024a7f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b03909116815260200161013d565b6101596102703660046108c9565b60056020525f908152604090205460ff1681565b61013360035481565b610133600881565b61013360025481565b6101337f000000000000000000000000000000000000000000000000000000000000000081565b610133604081565b6101336102db366004610852565b60076020525f908152604090205481565b5f60088260ff161115610300576002610303565b60015b92915050565b6103116107ca565b5f5b60408110156103755760055f8261032e604060ff88166108f4565b610338919061090b565b8152602081019190915260409081015f205460ff16908390839081106103605761036061091e565b60ff9092166020929092020152600101610313565b50919050565b5f80610389602460406108f4565b67ffffffffffffffff8111156103a1576103a1610932565b6040519080825280601f01601f1916602001820160405280156103cb576020820181803683370190505b5090505f5b6103dc602460406108f4565b811015610434575f81815260056020526040902054825160f89190911b6001600160f81b031916908390839081106104165761041661091e565b60200101906001600160f81b03191690815f1a9053506001016103d0565b508051602090910120919050565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146104a95760405162461bcd60e51b81526020600482015260086024820152671b9bdd081a1bdcdd60c21b604482015260640160405180910390fd5b60015460ff16156104cd5760405163baf13b3f60e01b815260040160405180910390fd5b6001805460ff191681179055425f557fee6c4263b20ac9f11ba6da8a81ae2b29b4d099b52d853e1b8774cef1f664a7a361050561037b565b6003546004546040805193845260208401929092529082015242606082015260800160405180910390a1565b60015460ff168061054257505f5442115b156105605760405163baf13b3f60e01b815260040160405180910390fd5b60ff81161580610573575060108160ff16115b15610591576040516345f1af8960e01b815260040160405180910390fd5b600254335f908152600660205260409020546105ad9042610946565b10156105cc5760405163b0782df760e01b815260040160405180910390fd5b60408361ffff161015806105e5575060248261ffff1610155b15610603576040516345f1af8960e01b815260040160405180910390fd5b5f8361ffff1660408461ffff1661061a91906108f4565b610624919061090b565b5f8181526005602052604090205490915060ff80841691160361065a576040516358bf424160e01b815260040160405180910390fd5b335f9081526009602052604090205460ff1661069d57335f908152600960205260408120805460ff19166001179055600480549161069783610959565b91905055505b5f8181526005602052604090205460ff1680156106e65760085f6106c0836102ec565b60ff16815260208101919091526040015f9081208054916106e083610971565b91905055505b5f828152600560205260408120805460ff191660ff861617905560089061070c856102ec565b60ff16815260208101919091526040015f90812080549161072c83610959565b9091555050335f9081526006602090815260408083204290556007909152812080549161075883610959565b909155505060038054905f61076c83610959565b90915550829050337f06ccb49a091d489f63abf0e9b370de8a7899e0ddb81b35804f88d815768986538561079f816102ec565b6040805160ff9384168152929091166020830152429082015260600160405180910390a35050505050565b6040518061080001604052806040906020820280368337509192915050565b803560ff811681146107f9575f5ffd5b919050565b5f6020828403121561080e575f5ffd5b610817826107e9565b9392505050565b610800810181835f5b604081101561084957815160ff16835260209283019290910190600101610827565b50505092915050565b5f60208284031215610862575f5ffd5b81356001600160a01b0381168114610817575f5ffd5b803561ffff811681146107f9575f5ffd5b5f5f5f6060848603121561089b575f5ffd5b6108a484610878565b92506108b260208501610878565b91506108c0604085016107e9565b90509250925092565b5f602082840312156108d9575f5ffd5b5035919050565b634e487b7160e01b5f52601160045260245ffd5b8082028115828204841417610303576103036108e0565b80820180821115610303576103036108e0565b634e487b7160e01b5f52603260045260245ffd5b634e487b7160e01b5f52604160045260245ffd5b81810381811115610303576103036108e0565b5f6001820161096a5761096a6108e0565b5060010190565b5f8161097f5761097f6108e0565b505f19019056fea2646970667358221220de4b03d1f23ef364f6dc2c9abb0e9cd8e539ff50734fbdcbf5ba613d90a0224d64736f6c634300081e0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {},
+  "immutableReferences": {
+    "16": [
+      {
+        "length": 32,
+        "start": 675
+      }
+    ],
+    "22": [
+      {
+        "length": 32,
+        "start": 552
+      },
+      {
+        "length": 32,
+        "start": 1101
+      }
+    ]
+  },
+  "inputSourceName": "project/contracts/PlaceCanvas.sol",
+  "devdoc": {
+    "details": "状态用最朴素的 mapping，评审可直接读懂。",
+    "kind": "dev",
+    "methods": {},
+    "title": "Monad Place — 千人链上像素战争",
+    "version": 1
+  },
+  "evm": {
+    "gasEstimates": {
+      "creation": {
+        "codeDepositCost": "498400",
+        "executionCost": "infinite",
+        "totalCost": "infinite"
+      },
+      "external": {
+        "HEIGHT()": "272",
+        "PALETTE()": "228",
+        "TEAM_SPLIT()": "205",
+        "WIDTH()": "271",
+        "canvasHash()": "infinite",
+        "cooldownSeconds()": "2327",
+        "endAt()": "2305",
+        "getRow(uint8)": "infinite",
+        "isSealed()": "2376",
+        "lastPlacedAt(address)": "2493",
+        "owner()": "infinite",
+        "pixels(uint256)": "2539",
+        "place(uint16,uint16,uint8)": "infinite",
+        "placedCount(address)": "2580",
+        "seal()": "infinite",
+        "startAt()": "infinite",
+        "teamOf(uint8)": "458",
+        "teamPixels(uint8)": "2538",
+        "totalPlaced()": "2394",
+        "uniquePlayers()": "2307"
+      }
+    }
+  },
+  "metadata": "{\"compiler\":{\"version\":\"0.8.30+commit.73712a01\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"liveSeconds_\",\"type\":\"uint256\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"inputs\":[],\"name\":\"BadColor\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"Cooldown\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"NotLive\",\"type\":\"error\"},{\"inputs\":[],\"name\":\"SameColor\",\"type\":\"error\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bytes32\",\"name\":\"canvasHash\",\"type\":\"bytes32\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"totalPlaced\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"uniquePlayers\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"sealedAt\",\"type\":\"uint256\"}],\"name\":\"CanvasSealed\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"user\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"uint256\",\"name\":\"idx\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"color\",\"type\":\"uint8\"},{\"indexed\":false,\"internalType\":\"uint8\",\"name\":\"team\",\"type\":\"uint8\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"placedAt\",\"type\":\"uint256\"}],\"name\":\"PixelPlaced\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"HEIGHT\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"PALETTE\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"TEAM_SPLIT\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"WIDTH\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"canvasHash\",\"outputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"cooldownSeconds\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"endAt\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"y\",\"type\":\"uint8\"}],\"name\":\"getRow\",\"outputs\":[{\"internalType\":\"uint8[64]\",\"name\":\"row\",\"type\":\"uint8[64]\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"isSealed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"lastPlacedAt\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"pixels\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint16\",\"name\":\"x\",\"type\":\"uint16\"},{\"internalType\":\"uint16\",\"name\":\"y\",\"type\":\"uint16\"},{\"internalType\":\"uint8\",\"name\":\"color\",\"type\":\"uint8\"}],\"name\":\"place\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"placedCount\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"seal\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"startAt\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"color\",\"type\":\"uint8\"}],\"name\":\"teamOf\",\"outputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint8\",\"name\":\"\",\"type\":\"uint8\"}],\"name\":\"teamPixels\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"totalPlaced\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"uniquePlayers\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"details\":\"\\u72b6\\u6001\\u7528\\u6700\\u6734\\u7d20\\u7684 mapping\\uff0c\\u8bc4\\u5ba1\\u53ef\\u76f4\\u63a5\\u8bfb\\u61c2\\u3002\",\"kind\":\"dev\",\"methods\":{},\"title\":\"Monad Place \\u2014 \\u5343\\u4eba\\u94fe\\u4e0a\\u50cf\\u7d20\\u6218\\u4e89\",\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{\"canvasHash()\":{\"notice\":\"\\u6574\\u5e45\\u753b\\u7684 keccak256 \\u6307\\u7eb9\\uff08demo \\u7ec8\\u5c40\\u5c55\\u793a\\u7528\\uff09\"},\"getRow(uint8)\":{\"notice\":\"\\u5927\\u5c4f\\u51b7\\u542f\\u52a8\\u62c9\\u5168\\u91cf\\uff1a\\u6309\\u884c\\u53d6 64 \\u683c\"},\"place(uint16,uint16,uint8)\":{\"notice\":\"\\u843d\\u5b50\\uff1a\\u6bcf\\u7b14\\u4ea4\\u6613\\u6d82\\u4e00\\u683c\"},\"seal()\":{\"notice\":\"\\u4e3b\\u6301\\u4eba\\u7ec8\\u5c40\\uff1a\\u51bb\\u7ed3\\u753b\\u5e03\\u5e76\\u751f\\u6210\\u94fe\\u4e0a\\u6307\\u7eb9\\uff08\\u4ec5\\u90e8\\u7f72\\u8005\\u53ef\\u8c03\\u7528\\uff09\"}},\"notice\":\"\\u4e00\\u5757 64x36 \\u7684\\u5171\\u4eab\\u753b\\u5e03\\uff1a\\u6bcf\\u6b21\\u843d\\u5b50 = 1 \\u7b14 Monad \\u4ea4\\u6613\\uff1b         \\u51b7\\u5374\\u4e0e\\u9635\\u8425\\u89c4\\u5219\\u7531\\u5408\\u7ea6\\u5f3a\\u5236\\uff0c\\u7ec8\\u5c40 seal() \\u751f\\u6210\\u6574\\u5e45\\u753b\\u7684\\u94fe\\u4e0a\\u6307\\u7eb9\\u3002\",\"version\":1}},\"settings\":{\"compilationTarget\":{\"project/contracts/PlaceCanvas.sol\":\"PlaceCanvas\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\",\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"project/contracts/PlaceCanvas.sol\":{\"content\":\"// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.24;\\n\\n/// @title Monad Place \\u2014 \\u5343\\u4eba\\u94fe\\u4e0a\\u50cf\\u7d20\\u6218\\u4e89\\n/// @notice \\u4e00\\u5757 64x36 \\u7684\\u5171\\u4eab\\u753b\\u5e03\\uff1a\\u6bcf\\u6b21\\u843d\\u5b50 = 1 \\u7b14 Monad \\u4ea4\\u6613\\uff1b\\n///         \\u51b7\\u5374\\u4e0e\\u9635\\u8425\\u89c4\\u5219\\u7531\\u5408\\u7ea6\\u5f3a\\u5236\\uff0c\\u7ec8\\u5c40 seal() \\u751f\\u6210\\u6574\\u5e45\\u753b\\u7684\\u94fe\\u4e0a\\u6307\\u7eb9\\u3002\\n/// @dev \\u72b6\\u6001\\u7528\\u6700\\u6734\\u7d20\\u7684 mapping\\uff0c\\u8bc4\\u5ba1\\u53ef\\u76f4\\u63a5\\u8bfb\\u61c2\\u3002\\ncontract PlaceCanvas {\\n    uint256 public constant WIDTH = 64;\\n    uint256 public constant HEIGHT = 36;\\n    uint256 public constant PALETTE = 16;   // \\u989c\\u8272\\u7f16\\u53f7 1..16\\uff0c0 = \\u7a7a\\u767d\\n    uint256 public constant TEAM_SPLIT = 8; // 1..8 = \\u7d2b\\u6676\\u519b\\u56e2(\\u51b7\\u8272)\\uff0c9..16 = \\u9ec4\\u91d1\\u90e8\\u843d(\\u6696\\u8272)\\n\\n    uint256 public immutable startAt;\\n    uint256 public endAt; // seal \\u540e\\u51bb\\u7ed3\\n    bool public isSealed;\\n    address public immutable owner; // \\u4e3b\\u6301\\u4eba\\uff08\\u90e8\\u7f72\\u8005\\uff09\\uff1a\\u552f\\u4e00\\u6709\\u6743\\u8c03\\u7528 seal()\\n    uint256 public cooldownSeconds = 3;\\n    uint256 public totalPlaced;\\n    uint256 public uniquePlayers;\\n\\n    // idx = y * WIDTH + x\\n    mapping(uint256 => uint8) public pixels;\\n    mapping(address => uint256) public lastPlacedAt;\\n    mapping(address => uint256) public placedCount; // \\u4e2a\\u4eba\\u6392\\u884c\\u699c\\u6570\\u636e\\u6e90\\n    mapping(uint8 => uint256) public teamPixels;    // 1=\\u7d2b\\u6676 2=\\u9ec4\\u91d1\\n    mapping(address => bool) private known;\\n\\n    event PixelPlaced(address indexed user, uint256 indexed idx, uint8 color, uint8 team, uint256 placedAt);\\n    event CanvasSealed(bytes32 canvasHash, uint256 totalPlaced, uint256 uniquePlayers, uint256 sealedAt);\\n\\n    error NotLive();\\n    error BadColor();\\n    error Cooldown();\\n    error SameColor();\\n\\n    constructor(uint256 liveSeconds_) {\\n        owner = msg.sender; // \\u90e8\\u7f72\\u8005\\u5373\\u4e3b\\u6301\\u4eba\\uff0c\\u9632\\u6b62\\u89c2\\u4f17\\u63d0\\u524d seal \\u51bb\\u7ed3\\u5168\\u573a\\n        startAt = block.timestamp;\\n        endAt = startAt + liveSeconds_;\\n    }\\n\\n    /// @notice \\u843d\\u5b50\\uff1a\\u6bcf\\u7b14\\u4ea4\\u6613\\u6d82\\u4e00\\u683c\\n    function place(uint16 x, uint16 y, uint8 color) external {\\n        if (isSealed || block.timestamp > endAt) revert NotLive();\\n        if (color == 0 || color > PALETTE) revert BadColor();\\n        if (block.timestamp - lastPlacedAt[msg.sender] < cooldownSeconds) revert Cooldown();\\n        if (x >= WIDTH || y >= HEIGHT) revert BadColor();\\n\\n        uint256 idx = uint256(y) * WIDTH + uint256(x);\\n        if (pixels[idx] == color) revert SameColor();\\n\\n        if (!known[msg.sender]) {\\n            known[msg.sender] = true;\\n            uniquePlayers++;\\n        }\\n\\n        uint8 prev = pixels[idx];\\n        if (prev != 0) teamPixels[teamOf(prev)]--; // \\u8986\\u76d6\\u654c\\u683c\\u5b50\\uff1a\\u654c\\u65b9\\u8ba1\\u6570-1\\n        pixels[idx] = color;\\n        teamPixels[teamOf(color)]++;\\n\\n        lastPlacedAt[msg.sender] = block.timestamp;\\n        placedCount[msg.sender]++;\\n        totalPlaced++;\\n\\n        emit PixelPlaced(msg.sender, idx, color, teamOf(color), block.timestamp);\\n    }\\n\\n    /// @notice \\u4e3b\\u6301\\u4eba\\u7ec8\\u5c40\\uff1a\\u51bb\\u7ed3\\u753b\\u5e03\\u5e76\\u751f\\u6210\\u94fe\\u4e0a\\u6307\\u7eb9\\uff08\\u4ec5\\u90e8\\u7f72\\u8005\\u53ef\\u8c03\\u7528\\uff09\\n    function seal() external {\\n        require(msg.sender == owner, \\\"not host\\\");\\n        if (isSealed) revert NotLive();\\n        isSealed = true;\\n        endAt = block.timestamp;\\n        emit CanvasSealed(canvasHash(), totalPlaced, uniquePlayers, block.timestamp);\\n    }\\n\\n    function teamOf(uint8 color) public pure returns (uint8) {\\n        return color <= TEAM_SPLIT ? uint8(1) : uint8(2);\\n    }\\n\\n    /// @notice \\u6574\\u5e45\\u753b\\u7684 keccak256 \\u6307\\u7eb9\\uff08demo \\u7ec8\\u5c40\\u5c55\\u793a\\u7528\\uff09\\n    function canvasHash() public view returns (bytes32) {\\n        bytes memory buf = new bytes(WIDTH * HEIGHT);\\n        for (uint256 i = 0; i < WIDTH * HEIGHT; i++) {\\n            buf[i] = bytes1(pixels[i]);\\n        }\\n        return keccak256(buf);\\n    }\\n\\n    /// @notice \\u5927\\u5c4f\\u51b7\\u542f\\u52a8\\u62c9\\u5168\\u91cf\\uff1a\\u6309\\u884c\\u53d6 64 \\u683c\\n    function getRow(uint8 y) external view returns (uint8[64] memory row) {\\n        for (uint256 x = 0; x < WIDTH; x++) {\\n            row[x] = pixels[uint256(y) * WIDTH + x];\\n        }\\n    }\\n}\\n\",\"keccak256\":\"0x41dffacf32919500f39d49070f0c02863672ca7e226d63a6dfd26283ae6d9292\",\"license\":\"MIT\"}},\"version\":1}",
+  "storageLayout": {
+    "storage": [
+      {
+        "astId": 18,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "endAt",
+        "offset": 0,
+        "slot": "0",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 20,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "isSealed",
+        "offset": 0,
+        "slot": "1",
+        "type": "t_bool"
+      },
+      {
+        "astId": 25,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "cooldownSeconds",
+        "offset": 0,
+        "slot": "2",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 27,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "totalPlaced",
+        "offset": 0,
+        "slot": "3",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 29,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "uniquePlayers",
+        "offset": 0,
+        "slot": "4",
+        "type": "t_uint256"
+      },
+      {
+        "astId": 33,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "pixels",
+        "offset": 0,
+        "slot": "5",
+        "type": "t_mapping(t_uint256,t_uint8)"
+      },
+      {
+        "astId": 37,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "lastPlacedAt",
+        "offset": 0,
+        "slot": "6",
+        "type": "t_mapping(t_address,t_uint256)"
+      },
+      {
+        "astId": 41,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "placedCount",
+        "offset": 0,
+        "slot": "7",
+        "type": "t_mapping(t_address,t_uint256)"
+      },
+      {
+        "astId": 45,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "teamPixels",
+        "offset": 0,
+        "slot": "8",
+        "type": "t_mapping(t_uint8,t_uint256)"
+      },
+      {
+        "astId": 49,
+        "contract": "project/contracts/PlaceCanvas.sol:PlaceCanvas",
+        "label": "known",
+        "offset": 0,
+        "slot": "9",
+        "type": "t_mapping(t_address,t_bool)"
+      }
+    ],
+    "types": {
+      "t_address": {
+        "encoding": "inplace",
+        "label": "address",
+        "numberOfBytes": "20"
+      },
+      "t_bool": {
+        "encoding": "inplace",
+        "label": "bool",
+        "numberOfBytes": "1"
+      },
+      "t_mapping(t_address,t_bool)": {
+        "encoding": "mapping",
+        "key": "t_address",
+        "label": "mapping(address => bool)",
+        "numberOfBytes": "32",
+        "value": "t_bool"
+      },
+      "t_mapping(t_address,t_uint256)": {
+        "encoding": "mapping",
+        "key": "t_address",
+        "label": "mapping(address => uint256)",
+        "numberOfBytes": "32",
+        "value": "t_uint256"
+      },
+      "t_mapping(t_uint256,t_uint8)": {
+        "encoding": "mapping",
+        "key": "t_uint256",
+        "label": "mapping(uint256 => uint8)",
+        "numberOfBytes": "32",
+        "value": "t_uint8"
+      },
+      "t_mapping(t_uint8,t_uint256)": {
+        "encoding": "mapping",
+        "key": "t_uint8",
+        "label": "mapping(uint8 => uint256)",
+        "numberOfBytes": "32",
+        "value": "t_uint256"
+      },
+      "t_uint256": {
+        "encoding": "inplace",
+        "label": "uint256",
+        "numberOfBytes": "32"
+      },
+      "t_uint8": {
+        "encoding": "inplace",
+        "label": "uint8",
+        "numberOfBytes": "1"
+      }
+    }
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {
+      "canvasHash()": {
+        "notice": "整幅画的 keccak256 指纹（demo 终局展示用）"
+      },
+      "getRow(uint8)": {
+        "notice": "大屏冷启动拉全量：按行取 64 格"
+      },
+      "place(uint16,uint16,uint8)": {
+        "notice": "落子：每笔交易涂一格"
+      },
+      "seal()": {
+        "notice": "主持人终局：冻结画布并生成链上指纹（仅部署者可调用）"
+      }
+    },
+    "notice": "一块 64x36 的共享画布：每次落子 = 1 笔 Monad 交易；         冷却与阵营规则由合约强制，终局 seal() 生成整幅画的链上指纹。",
+    "version": 1
+  },
+  "argsData": "0x0000000000000000000000000000000000000000000000000000000000007080",
+  "transaction": {
+    "nonce": "0x0",
+    "hash": "0x66cf8f0bbb2b0d91dc70f5ef13ca8252dc18d07e1c670219e0d4dc190482196b",
+    "origin": "0x178fff273c5abcdfb79b3847bad41228ffa7544d"
+  },
+  "receipt": {
+    "blockHash": "0x16ab1f747929d2fd660328498559248b3526b8f61a623cbc360a42b945c82a32",
+    "blockNumber": "0x3365e7f",
+    "transactionIndex": "0x1"
+  }
+}
