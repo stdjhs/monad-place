@@ -7,6 +7,7 @@ import { usePublicClient } from "wagmi";
 import MassChorus from "~~/components/monad-place/MassChorus";
 import ParallelMeter from "~~/components/monad-place/ParallelMeter";
 import type { ParallelStats } from "~~/components/monad-place/ParallelMeter";
+import ReplayEngine from "~~/components/monad-place/ReplayEngine";
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWatchContractEvent } from "~~/hooks/scaffold-eth";
 import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY_COLOR, PALETTE, playNote } from "~~/utils/monad-place";
 
@@ -34,6 +35,16 @@ const Stage: NextPage = () => {
   const [top5, setTop5] = useState<[string, number][]>([]);
   const [sealed, setSealed] = useState<{ hash: string; total: string; players: string } | null>(null);
 
+  // P-C 回放模式：?replay=1 进入（ref+state 双轨：ref 供下方各实时 effect 守卫，state 供渲染）
+  const [replayMode, setReplayMode] = useState(false);
+  const replayRef = useRef(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("replay") === "1") {
+      replayRef.current = true;
+      setReplayMode(true);
+    }
+  }, []);
+
   const baseRef = useRef<HTMLCanvasElement>(null); // 像素层
   const fxRef = useRef<HTMLCanvasElement>(null); // 特效层（涟漪，每帧清空重画）
   const gridRef = useRef(new Uint8Array(BOARD_WIDTH * BOARD_HEIGHT));
@@ -51,8 +62,33 @@ const Stage: NextPage = () => {
     if (ripple) ripplesRef.current.push({ x: x + CELL / 2, y: y + CELL / 2, t: performance.now(), color: c });
   };
 
-  // 冷启动：36 行并行拉取链上全量画布（Promise.all，全量出图 ~3s）
+  // P-C 回放回调：正常帧 = 涟漪 + 音符（40ms 节流防倍速下爆音墙）+ TPS 重现
+  const lastNoteRef = useRef(0);
+  const replayEvent = (idx: number, c: number) => {
+    paintCell(idx, c, true);
+    const now = Date.now();
+    if (now - lastNoteRef.current > 40) {
+      playNote(c);
+      lastNoteRef.current = now;
+    }
+    recentRef.current.push(now);
+    recentRef.current = recentRef.current.filter(t => now - t < 5000);
+    setTps(recentRef.current.length / 5);
+  };
+  // 回放 seek 快进：只画像素（无特效无音，几万帧也不卡）
+  const fastPaint = (idx: number, c: number) => paintCell(idx, c, false);
+  // 回放重置：清空画布回到空白
+  const clearCanvas = () => {
+    const ctx = baseRef.current?.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = EMPTY_COLOR;
+      ctx.fillRect(0, 0, BOARD_WIDTH * CELL, BOARD_HEIGHT * CELL);
+    }
+  };
+
+  // 冷启动：36 行并行拉取链上全量画布（Promise.all，全量出图 ~3s）；回放模式自带冷启动（从空白重演）
   useEffect(() => {
+    if (replayRef.current) return;
     if (!publicClient || !contractInfo) return;
     (async () => {
       const ctx = baseRef.current?.getContext("2d");
@@ -85,6 +121,7 @@ const Stage: NextPage = () => {
   const chainTxRef = useRef<number | null>(null); // 最新采样块的全网交易数
   const [parallelStats, setParallelStats] = useState<ParallelStats>({ concurrent: 0, perBlock: [], chainTx: null });
   useEffect(() => {
+    if (replayRef.current) return; // 回放模式不跑实时对账
     if (!publicClient || !contractInfo) return;
     let stop = false;
 
@@ -160,6 +197,7 @@ const Stage: NextPage = () => {
   const wsActiveRef = useRef(false);
   const [wsActive, setWsActive] = useState(false); // 徽标渲染态：⚡实时 / ↻轮询
   useEffect(() => {
+    if (replayRef.current) return; // 回放模式不开实时 WS
     if (!contractInfo) return;
     const PIXEL_EVENT = parseAbiItem(
       "event PixelPlaced(address indexed user, uint256 indexed idx, uint8 color, uint8 team, uint256 placedAt)",
@@ -263,6 +301,7 @@ const Stage: NextPage = () => {
     contractName: "PlaceCanvas",
     eventName: "PixelPlaced",
     onLogs: logs => {
+      if (replayRef.current) return; // 回放模式不混入实时事件
       if (wsActiveRef.current) return;
       const now = Date.now();
       for (const log of logs) {
@@ -289,6 +328,7 @@ const Stage: NextPage = () => {
     contractName: "PlaceCanvas",
     eventName: "CanvasSealed",
     onLogs: logs => {
+      if (replayRef.current) return; // 回放模式不弹实时封盘横幅
       for (const log of logs) {
         setSealed({
           hash: String(log.args.canvasHash ?? ""),
@@ -369,6 +409,28 @@ const Stage: NextPage = () => {
         {/* P-A 并行仪表：同块并发 + 整链块吞吐 + 本合约最近 20 块迷你柱状图（数据来自对账循环） */}
         <ParallelMeter stats={parallelStats} />
         <span className="text-base text-[#94a3b8]">扫码参战 → {playUrl}</span>
+        {/* P-C 回放入口：isSealed 后高亮（终局回放 = L3 数据服务演示）；回放模式下变退出 */}
+        {replayMode ? (
+          <button
+            onClick={() => {
+              window.location.href = "/stage";
+            }}
+            className="px-3 py-1 rounded border border-[#fbbf24] text-[#fbbf24] text-base font-bold cursor-pointer"
+          >
+            ↩ 退出回放
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              window.location.href = "/stage?replay=1";
+            }}
+            className={`px-3 py-1 rounded border text-base font-bold cursor-pointer ${
+              sealed ? "border-[#fbbf24] text-[#fbbf24]" : "border-[#1e2440] text-[#94a3b8]"
+            }`}
+          >
+            ⏪ 回放
+          </button>
+        )}
       </div>
 
       {/* 双层画布：像素层(底) + 特效层(涟漪，覆盖) */}
@@ -408,8 +470,8 @@ const Stage: NextPage = () => {
           </div>
         )}
 
-        {/* 排行榜 */}
-        {top5.length > 0 && (
+        {/* 排行榜（回放模式隐藏：实时排行数据在回放中不更新） */}
+        {!replayMode && top5.length > 0 && (
           <div className="absolute right-4 bottom-4 bg-[#0b0e1dcc] px-4 py-3 rounded-lg text-base">
             <b>🏅 排行榜</b>
             {top5.map(([addr, n], i) => (
@@ -420,8 +482,11 @@ const Stage: NextPage = () => {
           </div>
         )}
 
-        {/* P-B 全场合唱：倒计时 → 3s 窗口 → 链上对账战报（自包含组件，按钮与覆盖层均 fixed 定位） */}
-        <MassChorus />
+        {/* P-B 全场合唱（回放模式隐藏，避免与回放进度条抢交互） */}
+        {!replayMode && <MassChorus />}
+
+        {/* P-C 回放引擎：进度条 + 播放/暂停/倍速/重播（回放模式独占） */}
+        {replayMode && <ReplayEngine replayEvent={replayEvent} fastPaint={fastPaint} clearCanvas={clearCanvas} />}
       </div>
     </main>
   );
