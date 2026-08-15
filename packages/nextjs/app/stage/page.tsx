@@ -5,6 +5,8 @@ import type { NextPage } from "next";
 import { decodeEventLog, parseAbiItem } from "viem";
 import { usePublicClient } from "wagmi";
 import MassChorus from "~~/components/monad-place/MassChorus";
+import ParallelMeter from "~~/components/monad-place/ParallelMeter";
+import type { ParallelStats } from "~~/components/monad-place/ParallelMeter";
 import { useDeployedContractInfo, useScaffoldReadContract, useScaffoldWatchContractEvent } from "~~/hooks/scaffold-eth";
 import { BOARD_HEIGHT, BOARD_WIDTH, EMPTY_COLOR, PALETTE, playNote } from "~~/utils/monad-place";
 
@@ -77,13 +79,33 @@ const Stage: NextPage = () => {
 
   // 对账补拉：每 2s 核对块高，遗漏区间按 100 块窗口补像素
   // （官方公共 RPC eth_getLogs 限 100 块/次；断线重连后大跨度必须分页，否则 -32602 假死）
+  // 同一循环顺带采集 P-A 并行仪表数据：本合约每块聚类 + 整链块吞吐，无额外请求负担
   const lastBlockRef = useRef(0n);
+  const perBlockMapRef = useRef(new Map<bigint, number>()); // 块高 → 本合约该块落子数
+  const chainTxRef = useRef<number | null>(null); // 最新采样块的全网交易数
+  const [parallelStats, setParallelStats] = useState<ParallelStats>({ concurrent: 0, perBlock: [], chainTx: null });
   useEffect(() => {
     if (!publicClient || !contractInfo) return;
     let stop = false;
+
+    // 整链块吞吐：官方推荐 eth_getBlockReceipts 批量法；RPC 不支持时回退全交易块计数（本地链冒烟兼容）
+    const sampleChainThroughput = async (bn: bigint) => {
+      try {
+        chainTxRef.current = (await publicClient.getBlockReceipts({ blockNumber: bn })).length;
+      } catch {
+        try {
+          const blk = await publicClient.getBlock({ blockNumber: bn, includeTransactions: true });
+          chainTxRef.current = blk.transactions.length;
+        } catch {
+          // 双法皆败：保持上一采样值
+        }
+      }
+    };
+
     const tick = async () => {
       try {
         const bn = await publicClient.getBlockNumber();
+        void sampleChainThroughput(bn);
         if (lastBlockRef.current === 0n) {
           lastBlockRef.current = bn; // 首轮只建基线
           return;
@@ -96,11 +118,28 @@ const Stage: NextPage = () => {
             eventName: "PixelPlaced",
             fromBlock: s,
             toBlock: e,
-          })) as { args: { idx?: unknown; color?: unknown } }[];
-          // 只补像素不重复计 TPS/排行（实时通道已计过；paintCell 幂等）
-          logs.forEach(log => paintCell(Number(log.args.idx ?? 0), Number(log.args.color ?? 0), false));
+          })) as { args: { idx?: unknown; color?: unknown }; blockNumber: bigint | null }[];
+          // 只补像素不重复计 TPS/排行（实时通道已计过；paintCell 幂等）；
+          // 同时按块聚类给并行仪表（聚类与 lastBlockRef 同步推进，窗口不重叠故不重复计数）
+          logs.forEach(log => {
+            paintCell(Number(log.args.idx ?? 0), Number(log.args.color ?? 0), false);
+            if (log.blockNumber !== null) {
+              perBlockMapRef.current.set(log.blockNumber, (perBlockMapRef.current.get(log.blockNumber) ?? 0) + 1);
+            }
+          });
           lastBlockRef.current = e;
         }
+        // 输出并行仪表快照：修剪旧块后取最近 20 个有事件块 + 最新整链采样
+        const entries = Array.from(perBlockMapRef.current.entries()).sort((a, b) =>
+          a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+        );
+        for (let i = 0; i < entries.length - 20; i++) perBlockMapRef.current.delete(entries[i][0]);
+        const perBlock = entries.slice(-20).map(([, n]) => n);
+        setParallelStats({
+          concurrent: perBlock.length > 0 ? perBlock[perBlock.length - 1] : 0,
+          perBlock,
+          chainTx: chainTxRef.current,
+        });
       } catch {
         // RPC 抖动：跳过本轮，2s 后重试
       }
@@ -319,6 +358,8 @@ const Stage: NextPage = () => {
           玩家 <b className="text-2xl">{uniquePlayers?.toString() ?? "0"}</b>
         </span>
         <span className="ml-auto text-2xl text-[#34d399]">TPS {tps.toFixed(1)}</span>
+        {/* P-A 并行仪表：同块并发 + 整链块吞吐 + 本合约最近 20 块迷你柱状图（数据来自对账循环） */}
+        <ParallelMeter stats={parallelStats} />
         <span className="text-base text-[#94a3b8]">扫码参战 → {playUrl}</span>
       </div>
 
