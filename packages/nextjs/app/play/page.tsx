@@ -22,7 +22,7 @@ import {
 
 // 观众端：连钱包 → 选阵营 → 选颜色 → 点画布落子（每次落子 = 1 笔真实 Monad 交易）
 const Play: NextPage = () => {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const { data: contractInfo, isLoading: loadingContract } = useDeployedContractInfo({ contractName: "PlaceCanvas" });
   const publicClient = usePublicClient();
 
@@ -34,6 +34,9 @@ const Play: NextPage = () => {
     contractName: "PlaceCanvas",
     functionName: "isSealed",
   });
+  // 主持人（部署者）判定：仅 owner 钱包能看到封盘按钮
+  const { data: owner } = useScaffoldReadContract({ contractName: "PlaceCanvas", functionName: "owner" });
+  const isHost = !!address && !!owner && address.toLowerCase() === String(owner).toLowerCase();
 
   const { writeContractAsync } = useScaffoldWriteContract({ contractName: "PlaceCanvas" });
 
@@ -59,7 +62,7 @@ const Play: NextPage = () => {
     ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
   };
 
-  // 冷启动：按行拉取链上全量画布
+  // 冷启动：36 行并行拉取（Promise.all，出图 ~3s）
   useEffect(() => {
     if (!publicClient || !contractInfo) return;
     (async () => {
@@ -68,15 +71,19 @@ const Play: NextPage = () => {
         ctx.fillStyle = EMPTY_COLOR;
         ctx.fillRect(0, 0, BOARD_WIDTH * CELL, BOARD_HEIGHT * CELL);
       }
-      for (let y = 0; y < BOARD_HEIGHT; y++) {
-        const row = (await publicClient.readContract({
-          address: contractInfo.address,
-          abi: contractInfo.abi,
-          functionName: "getRow",
-          args: [y],
-        })) as readonly number[];
+      const rows = (await Promise.all(
+        Array.from({ length: BOARD_HEIGHT }, (_, y) =>
+          publicClient.readContract({
+            address: contractInfo.address,
+            abi: contractInfo.abi,
+            functionName: "getRow",
+            args: [y],
+          }),
+        ),
+      )) as (readonly number[])[];
+      rows.forEach((row, y) => {
         for (let x = 0; x < BOARD_WIDTH; x++) if (row[x]) paintCell(y * BOARD_WIDTH + x, Number(row[x]));
-      }
+      });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicClient, contractInfo?.address]);
@@ -134,6 +141,26 @@ const Play: NextPage = () => {
               ? "比赛已结束"
               : "失败：" + m.slice(0, 60),
       );
+    }
+    setBusy(false);
+  };
+
+  // 主持人终局：封盘冻结画布并生成链上指纹（仅部署者钱包可见此按钮）
+  const sealGame = async () => {
+    if (busy) return;
+    setBusy(true);
+    setStatus("封盘中…（整幅画布 keccak256 指纹计算 ≈5.6M gas，请稍候）");
+    try {
+      await writeContractAsync({
+        functionName: "seal",
+        gasPrice: parseGwei(MONAD_GAS_PRICE_GWEI.toString()),
+        // seal ≈5.65M gas（canvasHash 遍历 2304 格），显式给足防止钱包低估（审计 L1）；viem 参数名为 gas
+        gas: 7_000_000n,
+      });
+      setStatus("🏁 已封盘，画布指纹永久上链");
+    } catch (err) {
+      const m = String((err as Error)?.message ?? err);
+      setStatus("封盘失败：" + m.slice(0, 60));
     }
     setBusy(false);
   };
@@ -204,7 +231,14 @@ const Play: NextPage = () => {
         }}
       />
 
-      <p className="mt-3 h-6 text-sm">{cdLeft > 0 ? `⏳ 冷却 ${cdLeft}s` : status}</p>
+      <p className="mt-3 h-6 text-sm">
+        {isSealed ? "🏁 比赛已封盘，画布指纹已上链" : cdLeft > 0 ? `⏳ 冷却 ${cdLeft}s` : status}
+      </p>
+      {isHost && !isSealed && (
+        <button className="btn btn-error btn-sm mt-2" onClick={sealGame} disabled={busy}>
+          🏁 主持人封盘
+        </button>
+      )}
       <p className="text-xs opacity-60 mt-1 text-center">每次落子 = 1 笔真实 Monad 测试网交易 · 冷却由智能合约强制</p>
     </main>
   );
