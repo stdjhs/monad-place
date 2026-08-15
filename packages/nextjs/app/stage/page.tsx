@@ -178,7 +178,12 @@ const Stage: NextPage = () => {
           // 只补像素不重复计 TPS/排行（实时通道已计过；paintCell 幂等）；
           // 同时按块聚类给并行仪表（聚类与 lastBlockRef 同步推进，窗口不重叠故不重复计数）
           logs.forEach(log => {
-            paintCell(Number(log.args.idx ?? 0), Number(log.args.color ?? 0), false);
+            // 兜底校验：日志形状异常（RPC 抖动/解码缺失）时跳过——默认成 0 会把 0 号格涂花
+            const idx = Number(log.args.idx);
+            const c = Number(log.args.color);
+            if (!Number.isInteger(idx) || idx < 0 || idx >= BOARD_WIDTH * BOARD_HEIGHT) return;
+            if (!Number.isInteger(c) || c < 1 || c >= PALETTE.length) return;
+            paintCell(idx, c, false);
             if (log.blockNumber !== null) {
               perBlockMapRef.current.set(log.blockNumber, (perBlockMapRef.current.get(log.blockNumber) ?? 0) + 1);
             }
@@ -200,12 +205,16 @@ const Stage: NextPage = () => {
         // RPC 抖动：跳过本轮，2s 后重试
       }
     };
-    const id = setInterval(() => {
-      if (!stop) void tick();
-    }, 2000);
+    // 自调度循环：上一轮 await 完才排下一轮，慢 RPC/大补拉窗口下 tick 不重叠（setInterval 会并发跑、竞态推进 lastBlockRef）
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const loop = async () => {
+      await tick(); // tick 内部已捕获异常，此 await 不会 reject
+      if (!stop) timer = setTimeout(loop, 2000);
+    };
+    timer = setTimeout(loop, 2000);
     return () => {
       stop = true;
-      clearInterval(id);
+      if (timer) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [publicClient, contractInfo?.address]);
@@ -237,8 +246,6 @@ const Stage: NextPage = () => {
         });
         if (decoded.eventName !== "PixelPlaced") return;
         const a = decoded.args as { user?: unknown; idx?: unknown; color?: unknown };
-        wsActiveRef.current = true;
-        setWsActive(true);
         const now = Date.now();
         const user = String(a.user ?? "0x0");
         const idx = Number(a.idx ?? 0);
@@ -262,7 +269,9 @@ const Stage: NextPage = () => {
     const connect = () => {
       if (closed) return;
       try {
-        ws = new WebSocket("wss://testnet-rpc.monad.xyz");
+        // 端点可配：本地链/fork/未来主网时覆盖（NEXT_PUBLIC_MONAD_WS_URL），默认测试网官方 WS
+        const wsUrl = process.env.NEXT_PUBLIC_MONAD_WS_URL || "wss://testnet-rpc.monad.xyz";
+        ws = new WebSocket(wsUrl);
         ws.onopen = () =>
           ws?.send(
             JSON.stringify({
@@ -283,6 +292,9 @@ const Stage: NextPage = () => {
             };
             if (msg.id === 1 && msg.result) {
               subId = msg.result;
+              // 订阅确认即置活：若等首条日志才置活，最初几笔会被 polling 通道重复处理（TPS/排行/音效双计）
+              wsActiveRef.current = true;
+              setWsActive(true);
             } else {
               const p = msg.params;
               if (msg.method === "eth_subscription" && p && p.subscription === subId && p.result) {
