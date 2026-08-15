@@ -4356,6 +4356,8 @@ __metadata:
     "@trivago/prettier-plugin-sort-imports": "npm:~6.0.2"
     "@types/node": "npm:~18.19.130"
     "@types/react": "npm:~19.2.14"
+    "@x402/core": "npm:^2.21.0"
+    "@x402/evm": "npm:^2.21.0"
     abitype: "npm:1.2.4"
     bgipfs: "npm:~0.0.18"
     blo: "npm:~2.0.0"
@@ -6968,6 +6970,26 @@ __metadata:
     multiformats: "npm:^13.3.1"
     uint8arrays: "npm:^5.1.0"
   checksum: 10/9bf1b9b4e2e8535c69fbadbbbd23441b0ca09dd3330e1b8110d074520b9ac13741ab385b301241231286c52b2db4562d6c9e7a83b3418c5bd6e87c71e0981e05
+  languageName: node
+  linkType: hard
+
+"@x402/core@npm:^2.21.0, @x402/core@npm:~2.21.0":
+  version: 2.21.0
+  resolution: "@x402/core@npm:2.21.0"
+  dependencies:
+    zod: "npm:^3.24.2"
+  checksum: 10/01d8c32562ad74a82cab324eade71b0e8c5fa1cffe7003285507329b90c84b4b3e3d5811d559ced78402ee39124079414704173cbd4a59bace0ef6defd628b89
+  languageName: node
+  linkType: hard
+
+"@x402/evm@npm:^2.21.0":
+  version: 2.21.0
+  resolution: "@x402/evm@npm:2.21.0"
+  dependencies:
+    "@x402/core": "npm:~2.21.0"
+    viem: "npm:^2.48.11"
+    zod: "npm:^3.24.2"
+  checksum: 10/72ff5240a727b93bc54eda02053be4dfbdb4fdd18a2d54c217021a105580a07e4b81255a4425f6b89e3480311a238f42ed742797cfb8f89d1b157dae6ad69239
   languageName: node
   linkType: hard
 
@@ -17911,7 +17933,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"viem@npm:>=2.29.0, viem@npm:^2.1.1, viem@npm:^2.23.12, viem@npm:^2.27.2, viem@npm:^2.31.7, viem@npm:^2.47.0, viem@npm:^2.48.2":
+"viem@npm:>=2.29.0, viem@npm:^2.1.1, viem@npm:^2.23.12, viem@npm:^2.27.2, viem@npm:^2.31.7, viem@npm:^2.47.0, viem@npm:^2.48.11, viem@npm:^2.48.2":
   version: 2.55.11
   resolution: "viem@npm:2.55.11"
   dependencies:
@@ -18506,7 +18528,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zod@npm:^3.22.4, zod@npm:^3.23.8, zod@npm:^3.25.76":
+"zod@npm:^3.22.4, zod@npm:^3.23.8, zod@npm:^3.24.2, zod@npm:^3.25.76":
   version: 3.25.76
   resolution: "zod@npm:3.25.76"
   checksum: 10/f0c963ec40cd96858451d1690404d603d36507c1fc9682f2dae59ab38b578687d542708a7fdbf645f77926f78c9ed558f57c3d3aa226c285f798df0c4da16995
